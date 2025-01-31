@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>To-Do List</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="logout-container">
+        <button onclick="confirmLogout()" class="btn-logout">Logout</button>
+    </div>
+
+    <!-- To-Do List Container -->
+    <div class="container">
+        <h1>To-Do List</h1>
+        <form action="{{ url_for('add_task') }}" method="POST" class="task-form">
+            <div class="form-row">
+                <div class="form-group">
+                    <input type="text" name="task" placeholder="Task" required>
+                </div>
+                <div class="form-group">
+                    <input type="text" name="priority" placeholder="Priority (H/M/L)" required>
+                </div>
+                <div class="form-group">
+                    <input type="text" name="due_date" placeholder="Due Date (dd mm yy)" required>
+                </div>
+                <div class="form-group">
+                    <input type="text" name="category" placeholder="Category" required>
+                </div>
+                <div class="form-group">
+                    <button type="submit" class="btn-primary">Add Task</button>
+                </div>
+            </div>
+        </form>
+        <!-- Filter Text Box and Cancel Sorting Button -->
+        <div class="filter-container">
+            <input type="text" id="filterInput" placeholder="Filter tasks..." onkeyup="filterTasks()">
+            <button onclick="cancelSorting()" class="btn-cancel">Cancel Sorting</button>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th onclick="sortTable(0)">Select</th>
+                    <th onclick="sortTable(1)">Task</th>
+                    <th onclick="sortTable(2)">Priority</th>
+                    <th onclick="sortTable(3)">Status</th>
+                    <th onclick="sortTable(4)">Due Date</th>
+                    <th onclick="sortTable(5)">Days Left</th>
+                    <th onclick="sortTable(6)" class="{% if has_rainbow %}rainbow-cell{% endif %}">
+                        Working Days
+                    </th>
+                    <th onclick="sortTable(7)">Category</th>
+                    <th onclick="sortTable(8)">Creation Date</th>
+                    <th onclick="sortTable(9)">Notes</th>
+                    <th onclick="sortTable(10)">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for task in tasks %}
+                <tr class="{% if task.id == selected_task.id %}selected{% endif %} {% if task.priority == 'High' %}high-priority{% elif task.priority == 'Medium' %}medium-priority{% endif %} {% if task.status == 'Completed' %}completed-task{% endif %}">
+                    <td onclick="window.location.href='{{ url_for('index', selected_task=task.id) }}'" class="selectable-cell">🔳</td>
+                    <td>{{ task.task }}</td>
+                    <td>{{ task.priority }}</td>
+                    <td>{{ task.status }}</td>
+                    <td>{{ task.due_date }}</td>
+                    <td>
+                        {% if task.due_date | to_date %}
+                            {{ (task.due_date | to_date - today).days }}
+                        {% else %}
+                            Invalid Date
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if task.due_date | to_date %}
+                            {{ working_days(today, task.due_date | to_date) }}
+                            {% if task.status == 'In Progress' %}
+                                {% if 6 <= (task.due_date | to_date - today).days <= 9 %}
+                                    <span class="alarm-icon">⚠️</span>
+                                {% elif 4 <= (task.due_date | to_date - today).days <= 5 %}
+                                    <span class="alarm-icon">⚠️⚠️</span>
+                                {% elif 1 <= (task.due_date | to_date - today).days <= 3 %}
+                                    <span class="alarm-icon">⚠️⚠️⚠️</span>
+                                {% endif %}
+                            {% endif %}
+                        {% else %}
+                            Invalid Date
+                        {% endif %}
+                    </td>
+                    <td>{{ task.category }}</td>
+                    <td>{{ task.creation_date }}</td>
+                    <td>{{ task.notes | length }}</td>
+                    <td>
+                        <a href="{{ url_for('edit_task', task_id=task.id) }}" class="btn-edit" onclick="return confirmAction('edit')">Edit</a>
+                        <a href="{{ url_for('delete_task', task_id=task.id) }}" class="btn-delete" onclick="return confirmAction('delete')">Delete</a>
+                        {% if task.status == 'In Progress' %}
+                            <button onclick="return confirmAction('complete', {{ task.id }})" class="btn-complete">Complete</button>
+                        {% else %}
+                            <button onclick="return confirmAction('revert', {{ task.id }})" class="btn-revert">In Progress</button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% if selected_task %}
+            <h2>Notes for "{{ selected_task.task }}"</h2>
+            <form action="{{ url_for('add_note', task_id=selected_task.id) }}" method="POST" class="note-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <textarea name="note" placeholder="Add a note" rows="4" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <button type="submit" class="btn-primary">Add Note</button>
+                    </div>
+                </div>
+            </form>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Note</th>
+                        <th>Creation Date</th>
+                        <th>Last Edit Date</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for note in selected_task.notes %}
+                    <tr class="{% if 'Task completed' in note.content %}completed-note{% elif 'Task reverted' in note.content %}reverted-note{% endif %}">
+                        <td>{{ note.content }}</td>
+                        <td>{{ note.creation_date }}</td>
+                        <td>{{ note.last_edit_date }}</td>
+                        <td>
+                            {% if 'Task completed' not in note.content and 'Task reverted' not in note.content %}
+                                <a href="{{ url_for('edit_note', note_id=note.id) }}" class="btn-edit" onclick="return confirmAction('edit')">Edit</a>
+                                <a href="{{ url_for('delete_note', note_id=note.id) }}" class="btn-delete" onclick="return confirmAction('delete')">Delete</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+    </div>
+    <script>
+        function filterTasks() {
+            const input = document.getElementById("filterInput").value.toUpperCase();
+            const table = document.querySelector("table");
+            const rows = table.getElementsByTagName("tr");
+
+            for (let i = 1; i < rows.length; i++) { // Skip header row
+                const cells = rows[i].getElementsByTagName("td");
+                let match = false;
+                for (let j = 0; j < cells.length; j++) {
+                    if (cells[j].textContent.toUpperCase().indexOf(input) > -1) {
+                        match = true;
+                        break;
+                    }
+                }
+                rows[i].style.display = match ? "" : "none";
+            }
+        }
+
+        function confirmAction(action, taskId) {
+            const password = prompt(`Enter your password to confirm ${action}:`);
+            if (password === "{{ session.get('password') }}") {
+                if (action === 'complete') {
+                    window.location.href = `{{ url_for('complete_task', task_id=0) }}`.replace("0", taskId);
+                } else if (action === 'revert') {
+                    window.location.href = `{{ url_for('revert_task', task_id=0) }}`.replace("0", taskId);
+                }
+                return true;
+            } else {
+                alert("Incorrect password!");
+                return false;
+            }
+        }
+
+        let currentSortColumn = null;
+        let isAscending = true;
+
+        function sortTable(columnIndex) {
+            const table = document.querySelector("table");
+            const rows = Array.from(table.querySelectorAll("tr")).slice(1); // Skip header row
+            const header = table.querySelector(`th:nth-child(${columnIndex + 1})`);
+
+            // Reset all headers
+            table.querySelectorAll("th").forEach(th => th.classList.remove("asc", "desc"));
+
+            if (currentSortColumn === columnIndex) {
+                // Toggle between ascending, descending, and cancel
+                if (header.classList.contains("asc")) {
+                    header.classList.remove("asc");
+                    header.classList.add("desc");
+                    isAscending = false;
+                } else if (header.classList.contains("desc")) {
+                    header.classList.remove("desc");
+                    isAscending = null; // Cancel sorting
+                } else {
+                    header.classList.add("asc");
+                    isAscending = true;
+                }
+            } else {
+                // Sort new column in ascending order
+                currentSortColumn = columnIndex;
+                header.classList.add("asc");
+                isAscending = true;
+            }
+
+            if (isAscending !== null) {
+                rows.sort((a, b) => {
+                    const aValue = a.querySelector(`td:nth-child(${columnIndex + 1})`).textContent.trim();
+                    const bValue = b.querySelector(`td:nth-child(${columnIndex + 1})`).textContent.trim();
+
+                    // Prioritize "In Progress" tasks over "Completed" tasks
+                    const aStatus = a.querySelector(`td:nth-child(4)`).textContent.trim();
+                    const bStatus = b.querySelector(`td:nth-child(4)`).textContent.trim();
+
+                    if (aStatus === "In Progress" && bStatus === "Completed") {
+                        return -1; // "In Progress" comes first
+                    } else if (aStatus === "Completed" && bStatus === "In Progress") {
+                        return 1; // "Completed" comes after
+                    } else {
+                        // Sort by value (ascending or descending)
+                        if (!isNaN(aValue) && !isNaN(bValue)) {
+                            return isAscending ? aValue - bValue : bValue - aValue; // Numeric sorting
+                        } else {
+                            return isAscending ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue); // Text sorting
+                        }
+                    }
+                });
+
+                // Clear existing rows
+                while (table.rows.length > 1) {
+                    table.deleteRow(1);
+                }
+
+                // Append sorted rows
+                rows.forEach(row => table.appendChild(row));
+            } else {
+                // Cancel sorting: Reload the page or reset the table to its original state
+                window.location.reload(); // Or implement a way to reset the table
+            }
+        }
+
+        // Cancel Sorting Button
+        function cancelSorting() {
+            window.location.reload();
+        }
+
+        // Logout Confirmation
+        function confirmLogout() {
+            if (confirm("Are you sure you want to logout?")) {
+                window.location.href = "{{ url_for('logout') }}";
+            }
+        }
+
+        // Add click event listeners to table headers
+        document.querySelectorAll("th").forEach((header, index) => {
+            header.style.cursor = "pointer";
+            header.onclick = () => sortTable(index);
+        });
+    </script>
+</body>
+</html>
