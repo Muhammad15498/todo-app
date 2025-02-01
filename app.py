@@ -299,8 +299,13 @@ def delete_note(note_id):
     flash('Note deleted successfully!', 'success')
     return redirect(url_for('index', selected_task=task_id))
 
-# Run the app
-if __name__ == '__main__':
+# WSGI entry point for Vercel
+def create_app():
     with app.app_context():
         db.create_all()  # Create the database and tables
-    app.run(host='0.0.0.0', port=5000, debug=True)  # Use 0.0.0.0 for external access
+    return app
+
+# Run the app locally (optional)
+if __name__ == '__main__':
+    app = create_app()
+    app.run(host='0.0.0.0', port=5000, debug=True)
