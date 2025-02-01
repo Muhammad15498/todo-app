@@ -51,6 +51,11 @@ class Note(db.Model):
     last_edit_date = db.Column(db.String(20), nullable=True)
     task_id = db.Column(db.Integer, db.ForeignKey('task.id'), nullable=False)
 
+# Initialize the database
+def initialize_database():
+    with app.app_context():
+        db.create_all()  # Create the database and tables
+
 # Home Page
 @app.route('/')
 def index():
@@ -301,8 +306,7 @@ def delete_note(note_id):
 
 # WSGI entry point for Vercel
 def create_app():
-    with app.app_context():
-        db.create_all()  # Create the database and tables
+    initialize_database()  # Ensure the database is initialized
     return app
 
 # Run the app locally (optional)
