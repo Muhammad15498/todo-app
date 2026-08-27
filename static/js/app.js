@@ -1,6 +1,6 @@
 import { db, uid } from "./db.js";
 import { SAMPLES } from "./samples.js";
-import { lookup, speak } from "./lookup.js";
+import { lookup, speak, testGemini } from "./lookup.js";
 import { Reader, kindFromName, titleFromName, removeExplainButton } from "./reader.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -58,6 +58,7 @@ function showView(name) {
   $("#view-vocab").classList.toggle("hidden", name !== "vocab");
   $("#topbar").classList.toggle("hidden", name === "reader");
   if (name !== "reader") closePanel();
+  removeExplainButton();
 }
 
 function formatBytes(n) {
@@ -128,6 +129,7 @@ async function openDoc(id) {
   await db.putDoc(doc);
   state.current = doc;
   showView("reader");
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   $("#readerTitle").textContent = doc.title;
   $("#panelBody").innerHTML = emptyPanelHtml();
   closePanel(true);
@@ -620,10 +622,27 @@ async function boot() {
     if (!key) return toast("Paste the Gemini key first.");
     state.settings.geminiKey = key;
     await db.setKV("settings", state.settings);
-    $("#bannerKey").value = "";
     syncGeminiBanner();
-    toast("Gemini key saved on this device");
+    toast("Gemini key saved");
   });
+
+  async function runGeminiTest(key) {
+    const k = (key || state.settings.geminiKey || "").trim();
+    if (!k) return toast("Paste the Gemini key first.");
+    toast("Testing Gemini…");
+    try {
+      const reply = await testGemini(k);
+      toast("Gemini works: " + reply.slice(0, 40));
+    } catch (err) {
+      toast("Gemini failed: " + (err.message || "unknown"));
+    }
+  }
+  $("#bannerTest")?.addEventListener("click", () =>
+    runGeminiTest($("#bannerKey").value.trim() || state.settings.geminiKey)
+  );
+  $("#setTest")?.addEventListener("click", () =>
+    runGeminiTest($("#setGemini").value.trim() || state.settings.geminiKey)
+  );
 
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {

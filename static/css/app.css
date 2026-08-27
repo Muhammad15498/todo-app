@@ -437,6 +437,9 @@ a { color: var(--accent); }
   display: flex;
   justify-content: center;
 }
+.pdf-page-slot .pdf-page-inner {
+  width: min(100%, 920px);
+}
 .pdf-page-inner {
   position: relative;
   background: #fff;

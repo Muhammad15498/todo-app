@@ -1,6 +1,4 @@
-function unique(list) {
-  return [...new Set(list.filter(Boolean))];
-}
+const GEMINI_MODEL = "gemini-3.5-flash-lite";
 
 export async function lookup({ query, sentence, passage, settings }) {
   const q = (query || "").replace(/\s+/g, " ").trim();
@@ -22,21 +20,24 @@ export async function lookup({ query, sentence, passage, settings }) {
 
   const geminiKey = (settings?.geminiKey || "").trim();
   if (!geminiKey) {
-    result.aiError = "Paste your Gemini key on the home screen first — same key as the Chrome extension.";
+    result.aiError = "Paste your Gemini key first, then tap Test key.";
     return result;
   }
 
   try {
-    result.coach = await geminiExplain({
-      word: q,
-      sentence,
-      passage: (passage || "").slice(0, 3500),
-      settings: { ...settings, geminiKey }
-    });
+    const text = await geminiGenerate(
+      geminiKey,
+      buildCoachPrompt(wordSafe(q), sentence, (passage || "").slice(0, 2500))
+    );
+    result.coach = parseCoach(text);
   } catch (err) {
     result.aiError = err.message || "Could not reach Gemini.";
   }
   return result;
+}
+
+function wordSafe(q) {
+  return String(q).slice(0, 80);
 }
 
 function buildCoachPrompt(word, sentence, passage) {
@@ -195,14 +196,10 @@ export function parseCoach(text) {
   return result;
 }
 
-function extractText(data) {
-  return data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-}
-
-async function geminiBrowser(key, model, prompt) {
+async function geminiGenerate(key, prompt) {
   const url =
     "https://generativelanguage.googleapis.com/v1beta/models/" +
-    encodeURIComponent(model) +
+    GEMINI_MODEL +
     ":generateContent?key=" +
     encodeURIComponent(key);
   const res = await fetch(url, {
@@ -212,53 +209,18 @@ async function geminiBrowser(key, model, prompt) {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(data.error?.message || `Gemini ${res.status}`);
+    throw new Error(data.error?.message || `Gemini HTTP ${res.status}`);
   }
-  const text = extractText(data);
-  if (!text) throw new Error("No explanation returned.");
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  if (!text) throw new Error("Gemini returned an empty answer.");
   return text;
 }
 
-async function geminiProxy(key, model, prompt) {
-  const res = await fetch("/api/explain", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ key, model, prompt })
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || `AI error ${res.status}`);
-  if (!data.text) throw new Error("No explanation returned.");
-  return data.text;
-}
-
-async function geminiExplain({ word, sentence, passage, settings }) {
-  const prompt = buildCoachPrompt(word, sentence, passage);
-  const models = unique([
-    settings.model,
-    "gemini-3.5-flash-lite",
-    "gemini-2.5-flash",
-    "gemini-2.0-flash",
-    "gemini-flash-latest"
-  ]);
-  let lastErr = "Could not connect to Gemini.";
-  for (const model of models) {
-    try {
-      const text = await geminiBrowser(settings.geminiKey, model, prompt);
-      return parseCoach(text);
-    } catch (err) {
-      lastErr = err.message || lastErr;
-      try {
-        const text = await geminiProxy(settings.geminiKey, model, prompt);
-        return parseCoach(text);
-      } catch (err2) {
-        lastErr = err2.message || lastErr;
-      }
-    }
-  }
-  throw new Error(
-    lastErr +
-      " — if this keeps failing, open the preview in a new browser tab (not the small side panel) and try again."
-  );
+export async function testGemini(key) {
+  const k = (key || "").trim();
+  if (!k) throw new Error("No key.");
+  const text = await geminiGenerate(k, "Reply with the single word: OK");
+  return text.trim();
 }
 
 export function speak(text, lang = "en") {

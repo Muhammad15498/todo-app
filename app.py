@@ -22,6 +22,13 @@ def _fetch(url, timeout=12):
         return res.read(), res.status, res.headers.get("Content-Type", "application/json")
 
 
+@app.after_request
+def no_cache(resp):
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    return resp
+
+
 @app.route("/")
 def index():
     return render_template("index.html")

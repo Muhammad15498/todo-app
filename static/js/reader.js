@@ -202,8 +202,10 @@ export class Reader {
   }
 
   pageCssWidth() {
-    const w = this.stage.clientWidth || 720;
-    return Math.max(280, Math.floor((w - 36) * this.zoom));
+    const box = this.stage.getBoundingClientRect();
+    const raw = box.width || this.stage.clientWidth || 0;
+    const w = raw > 120 ? raw : 820;
+    return Math.max(420, Math.floor((w - 28) * this.zoom));
   }
 
   async load({ type, title, text, blob }) {
@@ -320,6 +322,7 @@ export class Reader {
     );
     this._slots.forEach((s) => io.observe(s));
     this.cleanup.push(() => io.disconnect());
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     if (this._slots[0]) await draw(this._slots[0]);
     this._redraw = () => {
       this._drawn.clear();
