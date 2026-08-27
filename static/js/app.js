@@ -13,7 +13,8 @@ const DEFAULTS = {
   hover: false,
   lang: "ar",
   geminiKey: "",
-  model: "gemini-3.5-flash-lite"
+  groqKey: "",
+  model: "gemini-2.0-flash-lite"
 };
 
 const state = {
@@ -439,6 +440,7 @@ function fillSettings() {
   $("#setFont").value = state.settings.font;
   $("#setLang").value = state.settings.lang;
   $("#setGemini").value = state.settings.geminiKey || "";
+  if ($("#setGroq")) $("#setGroq").value = state.settings.groqKey || localStorage.getItem("cw-groq") || "";
 }
 
 async function saveSettings() {
@@ -448,7 +450,8 @@ async function saveSettings() {
     fontSize: Number($("#setSize").value),
     font: $("#setFont").value,
     lang: $("#setLang").value,
-    geminiKey: $("#setGemini").value.trim()
+    geminiKey: $("#setGemini").value.trim(),
+    groqKey: ($("#setGroq") && $("#setGroq").value.trim()) || ""
   };
   persistLocalSettings();
   db.setKV("settings", state.settings).catch(() => {});
@@ -522,6 +525,8 @@ function loadLocalSettings() {
     if (raw) Object.assign(state.settings, JSON.parse(raw));
     const key = localStorage.getItem("cw-gemini");
     if (key) state.settings.geminiKey = key;
+    const groq = localStorage.getItem("cw-groq");
+    if (groq) state.settings.groqKey = groq;
   } catch {
     /* ignore */
   }
@@ -532,6 +537,7 @@ function persistLocalSettings() {
   try {
     localStorage.setItem("cw-settings", JSON.stringify(state.settings));
     if (state.settings.geminiKey) localStorage.setItem("cw-gemini", state.settings.geminiKey);
+    if (state.settings.groqKey) localStorage.setItem("cw-groq", state.settings.groqKey);
   } catch {
     /* ignore */
   }

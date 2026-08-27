@@ -34,6 +34,109 @@
     }
   }
 
+  function groqKey() {
+    var a = el("bannerGroq");
+    var b = el("setGroq");
+    var fromBox = ((a && a.value) || (b && b.value) || "").trim();
+    try {
+      return fromBox || (localStorage.getItem("cw-groq") || "").trim();
+    } catch (e) {
+      return fromBox;
+    }
+  }
+
+  var GEMINI_MODELS = [
+    "gemini-2.0-flash-lite",
+    "gemini-2.5-flash-lite",
+    "gemini-2.0-flash",
+    "gemini-1.5-flash",
+    "gemini-2.5-flash",
+    "gemini-3.5-flash-lite"
+  ];
+  var GROQ_MODELS = ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"];
+
+  function isQuotaMsg(msg) {
+    return /quota|rate.?limit|429|resource.?exhausted/i.test(String(msg || ""));
+  }
+
+  async function generateFree(prompt) {
+    var gem = key();
+    var groq = groqKey();
+    var last = "Paste a Gemini or Groq key first.";
+    var i;
+    if (gem) {
+      for (i = 0; i < GEMINI_MODELS.length; i += 1) {
+        try {
+          var res = await fetch(
+            "https://generativelanguage.googleapis.com/v1beta/models/" +
+              GEMINI_MODELS[i] +
+              ":generateContent?key=" +
+              encodeURIComponent(gem),
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+            }
+          );
+          var data = await res.json().catch(function () {
+            return {};
+          });
+          if (!res.ok) {
+            last = (data.error && data.error.message) || String(res.status);
+            if (!isQuotaMsg(last) && !/not found|404/i.test(String(last))) throw new Error(last);
+            continue;
+          }
+          var text =
+            data.candidates &&
+            data.candidates[0] &&
+            data.candidates[0].content &&
+            data.candidates[0].content.parts &&
+            data.candidates[0].content.parts[0] &&
+            data.candidates[0].content.parts[0].text;
+          if (text) return text;
+        } catch (err) {
+          last = err.message || last;
+          if (!isQuotaMsg(last) && !/not found|404/i.test(String(last))) throw err;
+        }
+      }
+    }
+    if (groq) {
+      for (i = 0; i < GROQ_MODELS.length; i += 1) {
+        try {
+          var gres = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: "Bearer " + groq
+            },
+            body: JSON.stringify({
+              model: GROQ_MODELS[i],
+              temperature: 0.3,
+              messages: [{ role: "user", content: prompt }]
+            })
+          });
+          var gdata = await gres.json().catch(function () {
+            return {};
+          });
+          if (!gres.ok) {
+            last = (gdata.error && gdata.error.message) || String(gres.status);
+            continue;
+          }
+          var gtext =
+            gdata.choices && gdata.choices[0] && gdata.choices[0].message && gdata.choices[0].message.content;
+          if (gtext) return gtext;
+        } catch (err) {
+          last = err.message || last;
+        }
+      }
+    }
+    throw new Error(
+      isQuotaMsg(last)
+        ? "Still $0. Free Gemini allows about 15 lookups a minute on one model. Wait a minute, or paste a Groq key from console.groq.com."
+        : last
+    );
+  }
+
   function showModal(id, on) {
     var m = el(id);
     if (!m) {
@@ -216,12 +319,11 @@
       '<p class="plain"><span class="busy"></span> &nbsp; Understanding “' +
       escapeHtml(info.word) +
       '”…</p>';
-    var k = key();
-    if (!k) {
+    if (!key() && !groqKey()) {
       body.innerHTML =
         '<div class="panel-empty"><h2>' +
         escapeHtml(info.word) +
-        '</h2><p>Paste your Gemini key on the shelf, then highlight again.</p></div>';
+        '</h2><p>Paste a free Gemini key, or a Groq key from console.groq.com, then highlight again.</p></div>';
       return;
     }
     try {
@@ -232,33 +334,8 @@
         (info.sentence || "") +
         '". Nearby: "' +
         (info.passage || "").slice(0, 1800) +
-        '". Use extremely clear simple English. RETURN ONLY these headings:\nMeaning:\nContext:\nArabic:\nWhen To Use It:\nDon\'t Confuse:\nExamples:\nThe Idea:\n';
-      var res = await fetch(
-        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=" +
-          encodeURIComponent(k),
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-        }
-      );
-      var data = await res.json().catch(function () {
-        return {};
-      });
-      if (!res.ok) {
-        body.innerHTML =
-          '<p class="hint">Gemini failed: ' +
-          escapeHtml((data.error && data.error.message) || String(res.status)) +
-          "</p>";
-        return;
-      }
-      var raw =
-        data.candidates &&
-        data.candidates[0] &&
-        data.candidates[0].content &&
-        data.candidates[0].content.parts &&
-        data.candidates[0].content.parts[0] &&
-        data.candidates[0].content.parts[0].text;
+        '". Use extremely clear simple English. After reading they must know what it is in real life. RETURN ONLY:\nSounds Like:\nMeaning:\nContext:\nIn Real Life:\nPicture It:\nFor Instance:\nArabic:\nWhen To Use It:\nDon\'t Confuse:\nExamples:\nThe Idea:\n';
+      var raw = await generateFree(prompt);
       var coach = parseCoach(raw);
       function block(title, text, cls) {
         if (!text || !String(text).trim()) return "";
@@ -298,8 +375,7 @@
         };
       }
     } catch (err) {
-      body.innerHTML =
-        '<p class="hint">Could not reach Gemini in this window. Open the preview in a new tab.</p>';
+      body.innerHTML = '<p class="hint">' + escapeHtml(err.message || "Could not reach a free model.") + "</p>";
     }
   }
 
@@ -364,49 +440,22 @@
     say: say,
     saveKey: function () {
       var k = key();
-      if (!k) return say("Paste the Gemini key first.");
+      var g = groqKey();
+      if (!k && !g) return say("Paste a Gemini key or a Groq key first.");
       try {
-        localStorage.setItem("cw-gemini", k);
+        if (k) localStorage.setItem("cw-gemini", k);
+        if (g) localStorage.setItem("cw-groq", g);
       } catch (e) {}
-      var banner = el("bannerKey");
-      var set = el("setGemini");
-      if (banner && !banner.value) banner.value = k;
-      if (set && !set.value) set.value = k;
-      say("Key saved on this device.");
+      say(k && g ? "Gemini and Groq keys saved." : k ? "Gemini key saved." : "Groq key saved.");
     },
     testKey: async function () {
-      var k = key();
-      if (!k) return say("Paste the Gemini key first.");
-      say("Testing Gemini…");
+      if (!key() && !groqKey()) return say("Paste a Gemini key or a Groq key first.");
+      say("Testing a free model…");
       try {
-        var res = await fetch(
-          "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=" +
-            encodeURIComponent(k),
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: "Reply with the single word: OK" }] }]
-            })
-          }
-        );
-        var data = await res.json().catch(function () {
-          return {};
-        });
-        if (!res.ok) {
-          say("Gemini failed: " + ((data.error && data.error.message) || res.status));
-          return;
-        }
-        var text =
-          data.candidates &&
-          data.candidates[0] &&
-          data.candidates[0].content &&
-          data.candidates[0].content.parts &&
-          data.candidates[0].content.parts[0] &&
-          data.candidates[0].content.parts[0].text;
-        say("Gemini works: " + String(text || "OK").slice(0, 48));
+        var text = await generateFree("Reply with the single word: OK");
+        say("Works: " + String(text || "OK").slice(0, 48));
       } catch (err) {
-        say("Gemini blocked in this frame. Open the preview in a new tab.");
+        say(err.message || "Test failed");
       }
     },
     settings: function (on) {
@@ -422,11 +471,11 @@
     },
     saveSettings: function () {
       var k = ((el("setGemini") && el("setGemini").value) || "").trim() || key();
-      if (k) {
-        try {
-          localStorage.setItem("cw-gemini", k);
-        } catch (e) {}
-      }
+      var g = ((el("setGroq") && el("setGroq").value) || "").trim() || groqKey();
+      try {
+        if (k) localStorage.setItem("cw-gemini", k);
+        if (g) localStorage.setItem("cw-groq", g);
+      } catch (e) {}
       var theme = el("setTheme") && el("setTheme").value;
       if (theme) document.documentElement.dataset.theme = theme;
       showModal("settingsModal", false);
@@ -627,6 +676,6 @@
   ready(function () {
     wireFile();
     bindHighlightWatch();
-    say("Context Word · build 10 · sidebar stays put");
+    say("Context Word · build 11 · still free");
   });
 })();

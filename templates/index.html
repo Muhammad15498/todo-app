@@ -16,16 +16,16 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Outfit:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=10">
-  <script src="{{ url_for('static', filename='js/clicks.js') }}?v=10"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=11">
+  <script src="{{ url_for('static', filename='js/clicks.js') }}?v=11"></script>
 </head>
 <body>
-  <div id="bootBar">Context Word · build 10 · sidebar stays put</div>
+  <div id="bootBar">Context Word · build 11 · still free</div>
   <div class="app">
     <header class="topbar" id="topbar">
       <button class="brand" id="brand" type="button" aria-label="Context Word home" onclick="CW.home()">
         <img class="brand-mark" src="{{ url_for('static', filename='img/icon.png') }}" alt="">
-        <span class="brand-name">Context Word · 10</span>
+        <span class="brand-name">Context Word · 11</span>
       </button>
       <div class="top-actions">
         <button class="text-btn" id="btnVocab" type="button" onclick="CW.vocab()">Notebook</button>
@@ -43,16 +43,17 @@
     <section class="view library" id="view-library">
       <div class="setup-card" id="geminiBanner">
         <div>
-          <div class="drop-kicker">Context Word · build 10</div>
+          <div class="drop-kicker">Context Word · build 11</div>
           <h2>Paste your Gemini key once.</h2>
           <p>Then tap a word in a PDF and you’ll get Meaning, Context, and العربي ببساطة — in a side panel, not a popup.</p>
         </div>
         <div class="setup-row">
           <input id="bannerKey" type="password" autocomplete="off" placeholder="Gemini API key">
+          <input id="bannerGroq" type="password" autocomplete="off" placeholder="Groq key (optional)">
           <button class="primary-btn" id="bannerSave" type="button" onclick="CW.saveKey()">Save key</button>
           <button class="ghost-btn" id="bannerTest" type="button" onclick="CW.testKey()">Test key</button>
         </div>
-        <p class="hint" style="margin:0.6rem 0 0">Free from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>. Stored on this phone only.</p>
+        <p class="hint" style="margin:0.6rem 0 0">Gemini is free, but one model is capped at ~15 words/minute. We auto-switch to other free Gemini models. Optional backup: a Groq key from <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com</a> — also $0, usually faster. Keys stay on this device.</p>
       </div>
       <div class="hero">
         <div>
@@ -139,7 +140,7 @@
         <aside class="panel" id="panel" aria-live="polite">
           <div class="panel-handle" id="panelHandle"></div>
           <div class="panel-head">
-            <div class="panel-kicker">Context Word · build 10</div>
+            <div class="panel-kicker">Context Word · build 11</div>
             <button class="icon-btn panel-close-mobile" id="panelClose" type="button" aria-label="Close">×</button>
           </div>
           <div class="panel-body" id="panelBody"></div>
@@ -246,6 +247,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/epubjs@0.3.93/dist/epub.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js"></script>
-  <script type="module" src="{{ url_for('static', filename='js/app.js') }}?v=10"></script>
+  <script type="module" src="{{ url_for('static', filename='js/app.js') }}?v=11"></script>
 </body>
 </html>

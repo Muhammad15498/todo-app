@@ -1,4 +1,13 @@
-const GEMINI_MODEL = "gemini-3.5-flash-lite";
+const GEMINI_MODELS = [
+  "gemini-2.0-flash-lite",
+  "gemini-2.5-flash-lite",
+  "gemini-2.0-flash",
+  "gemini-1.5-flash",
+  "gemini-2.5-flash",
+  "gemini-3.5-flash-lite"
+];
+
+const GROQ_MODELS = ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"];
 
 export async function lookup({ query, sentence, passage, settings }) {
   const q = (query || "").replace(/\s+/g, " ").trim();
@@ -18,20 +27,30 @@ export async function lookup({ query, sentence, passage, settings }) {
     translation: null
   };
 
-  const geminiKey = (settings?.geminiKey || "").trim();
-  if (!geminiKey) {
-    result.aiError = "Paste your Gemini key first, then tap Test key.";
+  const geminiKey = (settings?.geminiKey || localStorage.getItem("cw-gemini") || "").trim();
+  const groqKey = (settings?.groqKey || localStorage.getItem("cw-groq") || "").trim();
+  if (!geminiKey && !groqKey) {
+    result.aiError = "Paste a free Gemini key, or a free Groq key, then highlight again.";
+    return result;
+  }
+
+  const cacheId = cacheKey(q, sentence);
+  const hit = cacheGet(cacheId);
+  if (hit) {
+    result.coach = hit;
     return result;
   }
 
   try {
-    const text = await geminiGenerate(
+    const text = await generateCoach(
       geminiKey,
+      groqKey,
       buildCoachPrompt(wordSafe(q), sentence, (passage || "").slice(0, 2500))
     );
     result.coach = parseCoach(text);
+    cacheSet(cacheId, result.coach);
   } catch (err) {
-    result.aiError = err.message || "Could not reach Gemini.";
+    result.aiError = friendlyError(err);
   }
   return result;
 }
