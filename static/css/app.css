@@ -70,7 +70,20 @@ button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 a { color: var(--accent); }
 
-.hidden { display: none !important; }
+.hidden { display: none !important; pointer-events: none !important; }
+
+#bootBar {
+  position: sticky;
+  top: 0;
+  z-index: 90;
+  background: #b4442e;
+  color: #faf6ee;
+  text-align: center;
+  padding: 0.5rem 0.8rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
 
 .app {
   min-height: 100%;
@@ -728,17 +741,20 @@ a { color: var(--accent); }
 .toast {
   position: fixed;
   left: 50%;
-  bottom: calc(1.2rem + var(--safe-b));
+  top: 3.8rem;
+  bottom: auto;
   transform: translateX(-50%);
   background: var(--ink);
   color: var(--paper);
-  padding: 0.55rem 0.9rem;
+  padding: 0.65rem 1rem;
   border-radius: 999px;
-  font-size: 0.88rem;
-  z-index: 40;
+  font-size: 0.95rem;
+  z-index: 100;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.2s;
+  max-width: 90vw;
+  text-align: center;
 }
 .toast.show { opacity: 1; }
 
@@ -822,9 +838,10 @@ a { color: var(--accent); }
     transform: translateY(110%);
     transition: transform 0.28s cubic-bezier(.2,.8,.2,1);
     z-index: 25;
+    pointer-events: none;
     box-shadow: 0 -18px 50px rgba(31, 26, 20, 0.18);
   }
-  .panel.open { transform: translateY(0); }
+  .panel.open { transform: translateY(0); pointer-events: auto; }
   .panel-handle { display: block; }
   .scrim {
     display: none;

@@ -16,18 +16,20 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Outfit:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=6">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=7">
+  <script src="{{ url_for('static', filename='js/clicks.js') }}?v=7"></script>
 </head>
 <body>
+  <div id="bootBar">Context Word · build 7 · buttons are live</div>
   <div class="app">
     <header class="topbar" id="topbar">
-      <button class="brand" id="brand" type="button" aria-label="Context Word home">
+      <button class="brand" id="brand" type="button" aria-label="Context Word home" onclick="CW.home()">
         <img class="brand-mark" src="{{ url_for('static', filename='img/icon.png') }}" alt="">
-        <span class="brand-name">Context Word</span>
+        <span class="brand-name">Context Word · 7</span>
       </button>
       <div class="top-actions">
-        <button class="text-btn" id="btnVocab" type="button">Notebook</button>
-        <button class="icon-btn" id="btnSettings" type="button" aria-label="Settings">
+        <button class="text-btn" id="btnVocab" type="button" onclick="CW.vocab()">Notebook</button>
+        <button class="icon-btn" id="btnSettings" type="button" aria-label="Settings" onclick="CW.settings(true)">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
         </button>
       </div>
@@ -41,14 +43,14 @@
     <section class="view library" id="view-library">
       <div class="setup-card" id="geminiBanner">
         <div>
-          <div class="drop-kicker">Same engine as your extension</div>
+          <div class="drop-kicker">Context Word · build 7</div>
           <h2>Paste your Gemini key once.</h2>
           <p>Then tap a word in a PDF and you’ll get Meaning, Context, and العربي ببساطة — in a side panel, not a popup.</p>
         </div>
         <div class="setup-row">
           <input id="bannerKey" type="password" autocomplete="off" placeholder="Gemini API key">
-          <button class="primary-btn" id="bannerSave" type="button">Save key</button>
-          <button class="ghost-btn" id="bannerTest" type="button">Test key</button>
+          <button class="primary-btn" id="bannerSave" type="button" onclick="CW.saveKey()">Save key</button>
+          <button class="ghost-btn" id="bannerTest" type="button" onclick="CW.testKey()">Test key</button>
         </div>
         <p class="hint" style="margin:0.6rem 0 0">Free from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>. Stored on this phone only.</p>
       </div>
@@ -57,11 +59,11 @@
           <h1>Your reader.<br><em>On the phone.</em></h1>
           <p class="lede">Open a PDF, EPUB, Word file, or pasted text. Tap a word — or select a short phrase — and Context Word explains it <em>from this sentence</em>, with Arabic, the way your Chrome extension does. The meaning sits in the margin, so the page stays put.</p>
           <div class="hero-actions">
-            <button class="primary-btn" id="openFile" type="button">Open a PDF or book</button>
-            <button class="ghost-btn" id="btnPaste" type="button">Paste text</button>
+            <button class="primary-btn" id="openFile" type="button" onclick="CW.openFile()">Open a PDF or book</button>
+            <button class="ghost-btn" id="btnPaste" type="button" onclick="CW.paste(true)">Paste text</button>
           </div>
         </div>
-        <div class="drop" id="drop">
+        <div class="drop" id="drop" onclick="CW.openFile()">
           <div>
             <div class="drop-kicker">On this device</div>
             <h2>Drop a book here.</h2>
@@ -81,7 +83,14 @@
         <h2>On the shelf</h2>
         <span>Tap a cover to read</span>
       </div>
-      <div class="shelf" id="shelf"></div>
+      <div class="shelf" id="shelf">
+        <article class="card" data-kind="sample" id="cardDemo" onclick="CW.sample()">
+          <div class="card-kind">Sample</div>
+          <h3>Try a page now</h3>
+          <p>Opens instantly. Highlight a word, then tap Explain.</p>
+          <div class="card-foot"><span>On this device</span><span>Tap me</span></div>
+        </article>
+      </div>
 
       <div class="tips">
         <div class="tip">
@@ -102,15 +111,15 @@
     <section class="view hidden" id="view-reader">
       <div class="reader">
         <div class="reader-bar">
-          <button class="ghost-btn" id="backLib" type="button">Shelf</button>
+          <button class="ghost-btn" id="backLib" type="button" onclick="CW.home()">Shelf</button>
           <div class="reader-title" id="readerTitle">Reading</div>
           <div class="zoom-group" id="zoomGroup">
             <button class="icon-btn" id="zoomOut" type="button" aria-label="Zoom out">−</button>
             <button class="ghost-btn" id="zoomFit" type="button">Fit</button>
             <button class="icon-btn" id="zoomIn" type="button" aria-label="Zoom in">+</button>
           </div>
-          <button class="text-btn" id="btnVocab2" type="button">Notebook</button>
-          <button class="icon-btn" id="btnSettings2" type="button" aria-label="Settings">
+          <button class="text-btn" id="btnVocab2" type="button" onclick="CW.vocab()">Notebook</button>
+          <button class="icon-btn" id="btnSettings2" type="button" aria-label="Settings" onclick="CW.settings(true)">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
           </button>
         </div>
@@ -118,7 +127,7 @@
         <aside class="panel" id="panel" aria-live="polite">
           <div class="panel-handle" id="panelHandle"></div>
           <div class="panel-head">
-            <div class="panel-kicker">Context Word · build 6</div>
+            <div class="panel-kicker">Context Word · build 7</div>
             <button class="icon-btn panel-close-mobile" id="panelClose" type="button" aria-label="Close">×</button>
           </div>
           <div class="panel-body" id="panelBody"></div>
@@ -128,7 +137,7 @@
 
     <section class="view vocab hidden" id="view-vocab">
       <div class="vocab">
-        <button class="ghost-btn" id="vocabBack" type="button">← Shelf</button>
+        <button class="ghost-btn" id="vocabBack" type="button" onclick="CW.home()">← Shelf</button>
         <h1>Notebook</h1>
         <p class="lede" style="margin-top:0">Words you saved, with the sentence that taught them.</p>
         <div class="hero-actions" style="margin-bottom:1.4rem">
@@ -158,8 +167,8 @@
         <textarea id="pasteText" placeholder="Paste here…"></textarea>
       </div>
       <div class="modal-actions">
-        <button class="ghost-btn" id="pasteCancel" type="button">Cancel</button>
-        <button class="primary-btn" id="pasteSave" type="button">Open to read</button>
+        <button class="ghost-btn" id="pasteCancel" type="button" onclick="CW.paste(false)">Cancel</button>
+        <button class="primary-btn" id="pasteSave" type="button" onclick="CW.savePaste()">Open to read</button>
       </div>
     </div>
   </div>
@@ -214,9 +223,9 @@
         <input id="setGemini" type="password" autocomplete="off" placeholder="From aistudio.google.com/apikey">
       </div>
       <div class="modal-actions">
-        <button class="ghost-btn" id="setTest" type="button">Test Gemini</button>
-        <button class="ghost-btn" id="setCancel" type="button">Close</button>
-        <button class="primary-btn" id="setSave" type="button">Save</button>
+        <button class="ghost-btn" id="setTest" type="button" onclick="CW.testKey()">Test Gemini</button>
+        <button class="ghost-btn" id="setCancel" type="button" onclick="CW.settings(false)">Close</button>
+        <button class="primary-btn" id="setSave" type="button" onclick="CW.saveSettings()">Save</button>
       </div>
     </div>
   </div>
@@ -225,60 +234,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/epubjs@0.3.93/dist/epub.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js"></script>
-  <script>
-    (function () {
-      function keyFromBox() {
-        var box = document.getElementById("bannerKey");
-        var set = document.getElementById("setGemini");
-        return ((box && box.value) || (set && set.value) || localStorage.getItem("cw-gemini") || "").trim();
-      }
-      function toast(msg) {
-        var el = document.getElementById("toast");
-        if (!el) { alert(msg); return; }
-        el.textContent = msg;
-        el.classList.add("show");
-        setTimeout(function () { el.classList.remove("show"); }, 3000);
-      }
-      window.cwSaveKey = function () {
-        var key = keyFromBox();
-        if (!key) { toast("Paste the Gemini key first."); return; }
-        try { localStorage.setItem("cw-gemini", key); } catch (e) {}
-        toast("Key saved.");
-      };
-      window.cwTestKey = async function () {
-        var key = keyFromBox();
-        if (!key) { toast("Paste the Gemini key first."); return; }
-        toast("Testing Gemini…");
-        try {
-          var res = await fetch(
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=" +
-              encodeURIComponent(key),
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ contents: [{ parts: [{ text: "Reply with the single word: OK" }] }] })
-            }
-          );
-          var data = await res.json();
-          if (!res.ok) {
-            toast("Gemini failed: " + ((data.error && data.error.message) || res.status));
-            return;
-          }
-          var part = data.candidates && data.candidates[0] && data.candidates[0].content &&
-            data.candidates[0].content.parts && data.candidates[0].content.parts[0];
-          toast("Gemini works: " + String((part && part.text) || "OK").slice(0, 40));
-        } catch (err) {
-          toast("Gemini blocked in this window: " + (err.message || "network"));
-        }
-      };
-      document.addEventListener("click", function (e) {
-        var t = e.target;
-        if (!t || !t.id) return;
-        if (t.id === "bannerSave") window.cwSaveKey();
-        if (t.id === "bannerTest" || t.id === "setTest") window.cwTestKey();
-      });
-    })();
-  </script>
-  <script type="module" src="{{ url_for('static', filename='js/app.js') }}?v=6"></script>
+  <script type="module" src="{{ url_for('static', filename='js/app.js') }}?v=7"></script>
 </body>
 </html>

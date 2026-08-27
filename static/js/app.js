@@ -542,8 +542,16 @@ async function boot() {
       "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
   }
 
-  $("#openFile").addEventListener("click", () => $("#fileInput").click());
-  $("#fileInput").addEventListener("change", (e) => ingestFiles(e.target.files));
+  window.cwIngestFiles = ingestFiles;
+  window.cwIngestPaste = ingestPaste;
+  window.cwRenderVocab = renderVocab;
+  window.cwSaveSettings = saveSettings;
+  if (!window.CW) {
+    $("#openFile")?.addEventListener("click", () => $("#fileInput").click());
+  }
+  if (!$("#fileInput")?.dataset.cwBound) {
+    $("#fileInput")?.addEventListener("change", (e) => ingestFiles(e.target.files));
+  }
   setupDrop($("#drop"));
   setupDrop($("#view-library"));
 

@@ -8,6 +8,10 @@ from urllib.request import Request, urlopen
 from flask import Flask, Response, jsonify, render_template, request, send_from_directory
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
+app.config["TEMPLATES_AUTO_RELOAD"] = True
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
+app.jinja_env.auto_reload = True
+app.jinja_env.cache = None
 
 
 def _fetch(url, timeout=12):
