@@ -14,7 +14,7 @@ const DEFAULTS = {
   lang: "ar",
   geminiKey: "",
   groqKey: "",
-  model: "gemini-2.0-flash-lite"
+  model: "gemini-3.5-flash-lite"
 };
 
 const state = {
@@ -265,6 +265,9 @@ function renderPanel(data, loading) {
     ? `
       ${coach.Meaning.trim() ? `<div class="block"><h3>Meaning</h3><p class="plain">${escapeHtml(coach.Meaning.trim())}</p></div>` : ""}
       ${coach.Context.trim() ? `<div class="block"><h3>Context</h3><p class="plain">${escapeHtml(coach.Context.trim())}</p></div>` : ""}
+      ${coach["In Real Life"]?.trim() ? `<div class="block"><h3>In real life</h3><p class="plain">${escapeHtml(coach["In Real Life"].trim())}</p></div>` : ""}
+      ${coach["Picture It"]?.trim() ? `<div class="block"><h3>Picture it</h3><p class="plain">${escapeHtml(coach["Picture It"].trim())}</p></div>` : ""}
+      ${coach["For Instance"]?.trim() ? `<div class="block"><h3>For instance</h3><p class="plain">${escapeHtml(coach["For Instance"].trim())}</p></div>` : ""}
       ${
         coach.Arabic.trim()
           ? `<div class="block"><h3>العربي ببساطة</h3><p class="translation" dir="rtl">${escapeHtml(coach.Arabic.trim())}</p></div>`
@@ -377,7 +380,8 @@ async function gloss(info) {
       passage: info.passage,
       settings: {
         ...state.settings,
-        geminiKey: state.settings.geminiKey || localStorage.getItem("cw-gemini") || ""
+        geminiKey: state.settings.geminiKey || localStorage.getItem("cw-gemini") || "",
+        groqKey: state.settings.groqKey || localStorage.getItem("cw-groq") || ""
       }
     });
     if (token !== state.lookupToken) return;

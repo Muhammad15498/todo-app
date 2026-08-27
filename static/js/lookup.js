@@ -1,13 +1,15 @@
 const GEMINI_MODELS = [
-  "gemini-2.0-flash-lite",
+  "gemini-3.5-flash-lite",
+  "gemini-3.5-flash",
   "gemini-2.5-flash-lite",
-  "gemini-2.0-flash",
-  "gemini-1.5-flash",
-  "gemini-2.5-flash",
-  "gemini-3.5-flash-lite"
+  "gemini-2.5-flash"
 ];
 
-const GROQ_MODELS = ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"];
+const GROQ_MODELS = [
+  "llama-3.1-8b-instant",
+  "llama-3.3-70b-versatile",
+  "gemma2-9b-it"
+];
 
 export async function lookup({ query, sentence, passage, settings }) {
   const q = (query || "").replace(/\s+/g, " ").trim();
@@ -227,10 +229,45 @@ export function parseCoach(text) {
   return result;
 }
 
-async function geminiGenerate(key, prompt) {
+function cacheKey(q, sentence) {
+  return String(q || "").toLowerCase() + "|" + String(sentence || "").slice(0, 160);
+}
+
+function cacheGet(id) {
+  try {
+    const raw = sessionStorage.getItem("cw-coach:" + id);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function cacheSet(id, coach) {
+  try {
+    sessionStorage.setItem("cw-coach:" + id, JSON.stringify(coach));
+  } catch {
+    /* ignore */
+  }
+}
+
+function skipModel(msg) {
+  return /quota|rate.?limit|429|resource.?exhausted|no longer available|not available|deprecated|not found|404|not supported/i.test(
+    String(msg || "")
+  );
+}
+
+function friendlyError(err) {
+  const msg = String(err && err.message ? err.message : err || "");
+  if (skipModel(msg) || /interactions api/i.test(msg)) {
+    return "Gemini is busy or that model is gone. Paste a Groq key from console.groq.com (also $0), Save, then Test key.";
+  }
+  return msg || "Could not reach a free model.";
+}
+
+async function geminiOnce(key, model, prompt) {
   const url =
     "https://generativelanguage.googleapis.com/v1beta/models/" +
-    GEMINI_MODEL +
+    model +
     ":generateContent?key=" +
     encodeURIComponent(key);
   const res = await fetch(url, {
@@ -239,18 +276,61 @@ async function geminiGenerate(key, prompt) {
     body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(data.error?.message || `Gemini HTTP ${res.status}`);
-  }
+  if (!res.ok) throw new Error(data.error?.message || `Gemini HTTP ${res.status}`);
   const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-  if (!text) throw new Error("Gemini returned an empty answer.");
+  if (!text) throw new Error("Empty Gemini answer.");
   return text;
 }
 
+async function groqOnce(key, model, prompt) {
+  const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + key
+    },
+    body: JSON.stringify({
+      model,
+      temperature: 0.3,
+      messages: [{ role: "user", content: prompt }]
+    })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error?.message || `Groq HTTP ${res.status}`);
+  const text = data?.choices?.[0]?.message?.content || "";
+  if (!text) throw new Error("Empty Groq answer.");
+  return text;
+}
+
+async function generateCoach(geminiKey, groqKey, prompt) {
+  let last = null;
+  if (groqKey) {
+    for (const model of GROQ_MODELS) {
+      try {
+        return await groqOnce(groqKey, model, prompt);
+      } catch (err) {
+        last = err;
+      }
+    }
+  }
+  if (geminiKey) {
+    for (const model of GEMINI_MODELS) {
+      try {
+        return await geminiOnce(geminiKey, model, prompt);
+      } catch (err) {
+        last = err;
+        if (!skipModel(err.message)) break;
+      }
+    }
+  }
+  throw last || new Error("Paste a Groq key from console.groq.com — also free.");
+}
+
 export async function testGemini(key) {
-  const k = (key || "").trim();
-  if (!k) throw new Error("No key.");
-  const text = await geminiGenerate(k, "Reply with the single word: OK");
+  const geminiKey = (key || localStorage.getItem("cw-gemini") || "").trim();
+  const groqKey = (localStorage.getItem("cw-groq") || "").trim();
+  if (!geminiKey && !groqKey) throw new Error("Paste a Gemini or Groq key first.");
+  const text = await generateCoach(geminiKey, groqKey, "Reply with the single word: OK");
   return text.trim();
 }
 

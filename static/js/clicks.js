@@ -46,17 +46,17 @@
   }
 
   var GEMINI_MODELS = [
-    "gemini-2.0-flash-lite",
+    "gemini-3.5-flash-lite",
+    "gemini-3.5-flash",
     "gemini-2.5-flash-lite",
-    "gemini-2.0-flash",
-    "gemini-1.5-flash",
-    "gemini-2.5-flash",
-    "gemini-3.5-flash-lite"
+    "gemini-2.5-flash"
   ];
-  var GROQ_MODELS = ["llama-3.1-8b-instant", "llama-3.3-70b-versatile"];
+  var GROQ_MODELS = ["llama-3.1-8b-instant", "llama-3.3-70b-versatile", "gemma2-9b-it"];
 
-  function isQuotaMsg(msg) {
-    return /quota|rate.?limit|429|resource.?exhausted/i.test(String(msg || ""));
+  function skipModel(msg) {
+    return /quota|rate.?limit|429|resource.?exhausted|no longer available|not available|deprecated|not found|404|not supported/i.test(
+      String(msg || "")
+    );
   }
 
   async function generateFree(prompt) {
@@ -64,42 +64,6 @@
     var groq = groqKey();
     var last = "Paste a Gemini or Groq key first.";
     var i;
-    if (gem) {
-      for (i = 0; i < GEMINI_MODELS.length; i += 1) {
-        try {
-          var res = await fetch(
-            "https://generativelanguage.googleapis.com/v1beta/models/" +
-              GEMINI_MODELS[i] +
-              ":generateContent?key=" +
-              encodeURIComponent(gem),
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-            }
-          );
-          var data = await res.json().catch(function () {
-            return {};
-          });
-          if (!res.ok) {
-            last = (data.error && data.error.message) || String(res.status);
-            if (!isQuotaMsg(last) && !/not found|404/i.test(String(last))) throw new Error(last);
-            continue;
-          }
-          var text =
-            data.candidates &&
-            data.candidates[0] &&
-            data.candidates[0].content &&
-            data.candidates[0].content.parts &&
-            data.candidates[0].content.parts[0] &&
-            data.candidates[0].content.parts[0].text;
-          if (text) return text;
-        } catch (err) {
-          last = err.message || last;
-          if (!isQuotaMsg(last) && !/not found|404/i.test(String(last))) throw err;
-        }
-      }
-    }
     if (groq) {
       for (i = 0; i < GROQ_MODELS.length; i += 1) {
         try {
@@ -130,9 +94,45 @@
         }
       }
     }
+    if (gem) {
+      for (i = 0; i < GEMINI_MODELS.length; i += 1) {
+        try {
+          var res = await fetch(
+            "https://generativelanguage.googleapis.com/v1beta/models/" +
+              GEMINI_MODELS[i] +
+              ":generateContent?key=" +
+              encodeURIComponent(gem),
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+            }
+          );
+          var data = await res.json().catch(function () {
+            return {};
+          });
+          if (!res.ok) {
+            last = (data.error && data.error.message) || String(res.status);
+            continue;
+          }
+          var text =
+            data.candidates &&
+            data.candidates[0] &&
+            data.candidates[0].content &&
+            data.candidates[0].content.parts &&
+            data.candidates[0].content.parts[0] &&
+            data.candidates[0].content.parts[0].text;
+          if (text) return text;
+        } catch (err) {
+          last = err.message || last;
+        }
+      }
+    }
     throw new Error(
-      isQuotaMsg(last)
-        ? "Still $0. Free Gemini allows about 15 lookups a minute on one model. Wait a minute, or paste a Groq key from console.groq.com."
+      skipModel(last) || /interactions api/i.test(String(last))
+        ? groq
+          ? "Still $0. Gemini skipped a retired model. Check the Groq key from console.groq.com, or wait a minute."
+          : "Paste a Groq key from console.groq.com (also $0), Save, then Test. Gemini retired the old model."
         : last
     );
   }
@@ -461,9 +461,11 @@
     settings: function (on) {
       if (typeof on !== "boolean") on = true;
       var set = el("setGemini");
-      if (on && set && !set.value) {
+      var groqBox = el("setGroq");
+      if (on) {
         try {
-          set.value = localStorage.getItem("cw-gemini") || "";
+          if (set && !set.value) set.value = localStorage.getItem("cw-gemini") || "";
+          if (groqBox && !groqBox.value) groqBox.value = localStorage.getItem("cw-groq") || "";
         } catch (e) {}
       }
       showModal("settingsModal", on);
@@ -676,6 +678,12 @@
   ready(function () {
     wireFile();
     bindHighlightWatch();
-    say("Context Word · build 11 · still free");
+    try {
+      var gk = localStorage.getItem("cw-gemini") || "";
+      var rq = localStorage.getItem("cw-groq") || "";
+      if (el("bannerKey") && gk) el("bannerKey").value = gk;
+      if (el("bannerGroq") && rq) el("bannerGroq").value = rq;
+    } catch (e) {}
+    say("Context Word · build 12 · Groq first");
   });
 })();
