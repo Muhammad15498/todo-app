@@ -292,12 +292,13 @@ export async function lookup({ query, sentence, passage, settings }) {
     }
   }
 
-  if (settings?.ai && settings.apiKey) {
+  const geminiKey = (settings?.geminiKey || "").trim();
+  if (geminiKey) {
     try {
-      result.ai = await aiExplain({
+      result.coach = await geminiExplain({
         word: q,
         sentence,
-        passage: (passage || "").slice(0, 1800),
+        passage: (passage || "").slice(0, 6000),
         settings
       });
     } catch (err) {
@@ -305,8 +306,8 @@ export async function lookup({ query, sentence, passage, settings }) {
     }
   }
 
-  if (settings?.lang && settings.lang !== "en") {
-    const toTranslate = result.ai?.plain || result.contextual?.definition || q;
+  if (!result.coach && settings?.lang && settings.lang !== "en") {
+    const toTranslate = result.contextual?.definition || q;
     try {
       result.translation = await translate(toTranslate, settings.lang);
     } catch {
@@ -317,43 +318,176 @@ export async function lookup({ query, sentence, passage, settings }) {
   return result;
 }
 
-async function aiExplain({ word, sentence, passage, settings }) {
-  const base = (settings.baseUrl || "https://api.openai.com/v1").replace(/\/$/, "");
-  const model = settings.model || "gpt-4o-mini";
-  const res = await fetch(`${base}/chat/completions`, {
+function buildCoachPrompt(word, sentence, passage) {
+  return `You are an English vocabulary coach helping a non-native English speaker understand authentic English.
+
+The learner highlighted:
+
+"${word}"
+
+The learner wants to understand the highlighted text mainly THROUGH ITS CONTEXT.
+
+CONTEXT:
+
+Immediate text:
+"${sentence || ""}"
+
+Nearby surrounding text:
+"${passage || ""}"
+
+IMPORTANT:
+
+The highlighted text may be only PART of a larger expression.
+
+For example:
+
+"account" in "take this into account" should be understood as "take something into account".
+
+"up" in "give up" should be understood as "give up".
+
+Use the surrounding context to identify the actual expression whenever the context clearly supports it.
+
+Do not force a larger phrase if the word is genuinely being used independently.
+
+LANGUAGE:
+
+The learner is an intelligent adult but is not a native English speaker.
+
+Use extremely clear, simple English.
+
+Do not explain a difficult word using another difficult word.
+
+The learner should NOT need to look up words inside your explanation.
+
+Prefer "accept that something is true" over "acknowledge something".
+
+Make the meaning obvious from the situation.
+
+RETURN ONLY THESE SECTIONS:
+
+Meaning:
+
+Very short and simple meaning.
+
+Context:
+
+Explain exactly what the writer means HERE.
+
+This is the MOST IMPORTANT section.
+
+Make the connection between the word and the surrounding situation very clear.
+
+If necessary, explain the relevant part of the sentence in simple English.
+
+Arabic:
+
+Explain the SAME contextual meaning in simple Egyptian-friendly Arabic.
+
+Do not translate word-for-word.
+
+Explain it naturally as: "هو هنا قصده كذا..."
+
+When To Use It:
+
+Briefly explain when a native speaker naturally uses this word or expression.
+
+Only 1–2 short sentences.
+
+Don't Confuse:
+
+Only include this if ONE similar word or expression could genuinely confuse the learner.
+
+Otherwise leave it empty.
+
+Examples:
+
+Give TWO short, natural examples.
+
+Keep them simple.
+
+The Idea:
+
+Give ONE short memorable idea only if useful.
+
+STRICT RULES:
+
+Context is the priority.
+
+Do not give a generic dictionary explanation when the context gives a clear meaning.
+
+Do not make the explanation complicated.
+
+Do not use Markdown.
+
+Do not use **.
+
+Do not use bullet points.
+
+Do not use emojis.
+
+Do not repeat yourself.
+
+Use exactly:
+
+Meaning:
+Context:
+Arabic:
+When To Use It:
+Don't Confuse:
+Examples:
+The Idea:
+`;
+}
+
+export function parseCoach(text) {
+  const result = {
+    Meaning: "",
+    Context: "",
+    Arabic: "",
+    "When To Use It": "",
+    "Don't Confuse": "",
+    Examples: "",
+    "The Idea": ""
+  };
+  const headings = [
+    "Meaning:",
+    "Context:",
+    "Arabic:",
+    "When To Use It:",
+    "Don't Confuse:",
+    "Examples:",
+    "The Idea:"
+  ];
+  let current = null;
+  for (const rawLine of String(text || "").split("\n")) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    const heading = headings.find((h) => line.toLowerCase().startsWith(h.toLowerCase()));
+    if (heading) {
+      current = heading.replace(":", "");
+      const content = line.substring(heading.length).trim();
+      if (content) result[current] += content + " ";
+    } else if (current) {
+      result[current] += line + " ";
+    }
+  }
+  return result;
+}
+
+async function geminiExplain({ word, sentence, passage, settings }) {
+  const res = await fetch("/api/explain", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${settings.apiKey}`
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model,
-      temperature: 0.2,
-      response_format: { type: "json_object" },
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are Gloss, a reading companion for English learners. Explain the selected word or short phrase IN THIS SPECIFIC CONTEXT, not every possible meaning. Use simple clear English (CEFR B1). Do not define a hard word with harder words. Return JSON only with keys: plain (1-2 sentences about this usage), pos (noun|verb|adjective|adverb|phrase|idiom|other), sense (very short gloss), nuance (tone/register or empty string), example (one original B1 example sentence)."
-        },
-        {
-          role: "user",
-          content: `Word/phrase: "${word}"\nSentence: ${sentence || "(none)"}\nPassage:\n${passage || "(none)"}`
-        }
-      ]
+      key: settings.geminiKey,
+      model: settings.model || "gemini-2.5-flash",
+      prompt: buildCoachPrompt(word, sentence, passage)
     })
   });
-  if (!res.ok) {
-    const t = await res.text();
-    throw new Error(t.slice(0, 180) || `AI error ${res.status}`);
-  }
-  const data = await res.json();
-  const text = data.choices?.[0]?.message?.content || "";
-  try {
-    return JSON.parse(text);
-  } catch {
-    return { plain: text, pos: "", sense: "", nuance: "", example: "" };
-  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `AI error ${res.status}`);
+  if (!data.text) throw new Error("No explanation returned.");
+  return parseCoach(data.text);
 }
 
 async function translate(text, lang) {

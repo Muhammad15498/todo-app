@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
@@ -56,6 +57,54 @@ def wiki(word):
         return Response(data, status=status, mimetype=mime)
     except HTTPError as err:
         return Response(err.read(), status=err.code, mimetype="application/json")
+    except (URLError, TimeoutError, OSError) as err:
+        return jsonify({"error": str(err)}), 502
+
+
+@app.post("/api/explain")
+def explain():
+    body = request.get_json(silent=True) or {}
+    key = (body.get("key") or "").strip()
+    prompt = (body.get("prompt") or "").strip()
+    model = (body.get("model") or "gemini-2.5-flash").strip()
+    if not key or not prompt:
+        return jsonify({"error": "Missing key or prompt"}), 400
+    if not re.match(r"^[a-zA-Z0-9._-]+$", model):
+        model = "gemini-2.5-flash"
+    url = (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        + model
+        + ":generateContent?key="
+        + quote(key)
+    )
+    payload = json.dumps({"contents": [{"parts": [{"text": prompt}]}]}).encode("utf-8")
+    req = Request(
+        url,
+        data=payload,
+        method="POST",
+        headers={
+            "Content-Type": "application/json",
+            "User-Agent": "GlossReader/1.0",
+        },
+    )
+    try:
+        with urlopen(req, timeout=45) as res:
+            data = json.loads(res.read().decode("utf-8"))
+        text = (
+            data.get("candidates", [{}])[0]
+            .get("content", {})
+            .get("parts", [{}])[0]
+            .get("text")
+            or ""
+        )
+        return jsonify({"text": text})
+    except HTTPError as err:
+        try:
+            detail = json.loads(err.read().decode("utf-8"))
+            msg = detail.get("error", {}).get("message") or str(err)
+        except Exception:
+            msg = str(err)
+        return jsonify({"error": msg}), err.code if err.code else 502
     except (URLError, TimeoutError, OSError) as err:
         return jsonify({"error": str(err)}), 502
 

@@ -26,7 +26,7 @@ Open [http://localhost:5000](http://localhost:5000). On a phone, visit the same 
 
 PDF · EPUB · Word (.docx) · plain text · Markdown · pasted articles
 
-Lookups use a free dictionary, ranked against the surrounding passage. Wikipedia is a fallback for names and terms. An optional OpenAI-compatible key (OpenAI, Groq, OpenRouter…) makes the “in this context” line more precise. The key never leaves this browser.
+Lookups use a public dictionary by default. Paste a **free Gemini key** (Google AI Studio) to get the same contextual coaching as the Context Word extension: Meaning, Context, Arabic, examples. The key is stored on the device, never in the repo.
 
 ## Privacy
 

@@ -11,11 +11,9 @@ const DEFAULTS = {
   fontSize: 20,
   font: "newsreader",
   hover: true,
-  lang: "en",
-  ai: false,
-  apiKey: "",
-  model: "gpt-4o-mini",
-  baseUrl: "https://api.openai.com/v1"
+  lang: "ar",
+  geminiKey: "",
+  model: "gemini-2.5-flash"
 };
 
 const state = {
@@ -243,15 +241,72 @@ function renderPanel(data, loading) {
     return;
   }
 
+  const coach = data.coach;
   const mainPlain =
-    data.ai?.plain ||
+    (coach && coach.Context.trim()) ||
+    (coach && coach.Meaning.trim()) ||
     data.contextual?.definition ||
     data.wiki?.extract ||
-    "I could not find a dictionary entry for this. Try a slightly shorter phrase, or check the spelling.";
+    "I could not find a dictionary entry for this. Try a slightly shorter phrase, or add a free Gemini key in Settings — the same engine as Context Word.";
 
-  const pos = data.ai?.pos || data.contextual?.pos || "";
-  const senses = (data.meanings || []).slice(0, 8);
-  const rtl = ["ar", "he", "fa", "ur"].includes(state.settings.lang);
+  const pos = data.contextual?.pos || "";
+  const senses = (data.meanings || []).slice(0, 6);
+
+  const coachHtml = coach
+    ? `
+      ${coach.Meaning.trim() ? `<div class="block"><h3>Meaning</h3><p class="plain">${escapeHtml(coach.Meaning.trim())}</p></div>` : ""}
+      ${coach.Context.trim() ? `<div class="block"><h3>Context</h3><p class="plain">${escapeHtml(coach.Context.trim())}</p></div>` : ""}
+      ${
+        coach.Arabic.trim()
+          ? `<div class="block"><h3>العربي ببساطة</h3><p class="translation" dir="rtl">${escapeHtml(coach.Arabic.trim())}</p></div>`
+          : ""
+      }
+      ${
+        data.sentence
+          ? `<div class="block"><h3>As used here</h3><p class="sentence">${markSentence(data.sentence, data.query)}</p></div>`
+          : ""
+      }
+      ${coach["When To Use It"].trim() ? `<div class="block"><h3>When to use it</h3><p class="plain">${escapeHtml(coach["When To Use It"].trim())}</p></div>` : ""}
+      ${coach["Don't Confuse"].trim() ? `<div class="block"><h3>Don't confuse</h3><p class="plain">${escapeHtml(coach["Don't Confuse"].trim())}</p></div>` : ""}
+      ${coach.Examples.trim() ? `<div class="block"><h3>Examples</h3><p class="sentence">${escapeHtml(coach.Examples.trim())}</p></div>` : ""}
+      ${coach["The Idea"].trim() ? `<div class="block"><h3>The idea</h3><p class="plain">${escapeHtml(coach["The Idea"].trim())}</p></div>` : ""}
+    `
+    : `
+      <div class="block">
+        <h3>In this context</h3>
+        <p class="plain">${escapeHtml(mainPlain)}</p>
+      </div>
+      ${
+        data.sentence
+          ? `<div class="block"><h3>As used here</h3><p class="sentence">${markSentence(data.sentence, data.query)}</p></div>`
+          : ""
+      }
+      ${
+        data.translation
+          ? `<div class="block"><h3>العربي ببساطة</h3><p class="translation" dir="rtl">${escapeHtml(data.translation)}</p></div>`
+          : ""
+      }
+      ${
+        data.phrases?.length
+          ? `<div class="block"><h3>This might be a phrase</h3>${data.phrases
+              .map(
+                (p) =>
+                  `<button class="phrase-chip" data-phrase="${escapeHtml(p.phrase)}"><b>${escapeHtml(p.phrase)}</b><span>${escapeHtml(p.definition)}</span></button>`
+              )
+              .join("")}</div>`
+          : ""
+      }
+      ${
+        data.contextual?.example
+          ? `<div class="block"><h3>Example</h3><p class="sentence">${escapeHtml(data.contextual.example)}</p></div>`
+          : ""
+      }
+      ${
+        !state.settings.geminiKey
+          ? `<p class="hint">For the same explanations as Context Word, paste a free Gemini key in Settings.</p>`
+          : ""
+      }
+    `;
 
   el.innerHTML = `
     <h2 class="headword">${escapeHtml(data.headword || data.query)}</h2>
@@ -260,57 +315,14 @@ function renderPanel(data, loading) {
       ${pos ? `<span class="pos">${escapeHtml(pos)}</span>` : ""}
       <button class="ghost-btn" id="speakWord" type="button">Listen</button>
     </div>
-
-    <div class="block">
-      <h3>In this context</h3>
-      <p class="plain">${escapeHtml(mainPlain)}</p>
-    </div>
-
-    ${
-      data.ai?.nuance
-        ? `<div class="block"><h3>Nuance</h3><p class="plain">${escapeHtml(data.ai.nuance)}</p></div>`
-        : ""
-    }
-
-    ${
-      data.sentence
-        ? `<div class="block"><h3>As used here</h3><p class="sentence">${markSentence(data.sentence, data.query)}</p></div>`
-        : ""
-    }
-
-    ${
-      data.translation
-        ? `<div class="block"><h3>In your language</h3><p class="translation" dir="${rtl ? "rtl" : "ltr"}">${escapeHtml(data.translation)}</p></div>`
-        : ""
-    }
-
-    ${
-      data.phrases?.length
-        ? `<div class="block"><h3>This might be a phrase</h3>${data.phrases
-            .map(
-              (p) =>
-                `<button class="phrase-chip" data-phrase="${escapeHtml(p.phrase)}"><b>${escapeHtml(p.phrase)}</b><span>${escapeHtml(p.definition)}</span></button>`
-            )
-            .join("")}</div>`
-        : ""
-    }
-
-    ${
-      data.ai?.example
-        ? `<div class="block"><h3>Simple example</h3><p class="sentence">${escapeHtml(data.ai.example)}</p></div>`
-        : data.contextual?.example
-          ? `<div class="block"><h3>Example</h3><p class="sentence">${escapeHtml(data.contextual.example)}</p></div>`
-          : ""
-    }
-
+    ${coachHtml}
     <div class="panel-actions">
       <button class="primary-btn" id="saveWord" type="button">Save to notebook</button>
       ${data.audio ? `<button class="ghost-btn" id="playAudio" type="button">Pronunciation</button>` : ""}
       ${data.wiki?.url ? `<a class="ghost-btn" href="${data.wiki.url}" target="_blank" rel="noopener">Wikipedia</a>` : ""}
     </div>
-
     ${
-      senses.length > 1
+      !coach && senses.length > 1
         ? `<p class="other-label">Other senses, ranked against this passage</p>
            <ul class="senses">${senses
              .slice(1)
@@ -411,6 +423,7 @@ function fillSettings() {
   $("#setFont").value = state.settings.font;
   $("#setHover").checked = !!state.settings.hover;
   $("#setLang").value = state.settings.lang;
+  $("#setGemini").value = state.settings.geminiKey || "";
 }
 
 async function saveSettings() {
@@ -421,7 +434,7 @@ async function saveSettings() {
     font: $("#setFont").value,
     hover: $("#setHover").checked,
     lang: $("#setLang").value,
-    ai: false
+    geminiKey: $("#setGemini").value.trim()
   };
   await db.setKV("settings", state.settings);
   applyTheme();
