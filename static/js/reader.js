@@ -54,12 +54,12 @@ export function extractSentence(text, word) {
   return (hit || parts[0] || text).trim();
 }
 
-export function selectionInfo(sel, doc = document) {
+export function selectionInfo(sel) {
   if (!sel || sel.isCollapsed) return null;
   const raw = sel.toString().replace(/\s+/g, " ").trim();
-  if (!raw || raw.length > 90) return null;
+  if (!raw || raw.length > 80) return null;
   const words = raw.split(" ").filter(Boolean);
-  if (words.length > 12) return null;
+  if (words.length > 4) return null;
   let passage = raw;
   try {
     const node = sel.anchorNode;
@@ -69,97 +69,82 @@ export function selectionInfo(sel, doc = document) {
   } catch {
     /* ignore */
   }
-  return { word: raw, sentence: extractSentence(passage, words[0]), passage, range: sel.rangeCount ? sel.getRangeAt(0) : null };
+  return {
+    word: raw,
+    sentence: extractSentence(passage, words[0]),
+    passage,
+    range: sel.rangeCount ? sel.getRangeAt(0) : null
+  };
 }
 
-function unwrap(el) {
-  if (!el || !el.parentNode) return;
-  const p = el.parentNode;
-  while (el.firstChild) p.insertBefore(el.firstChild, el);
-  p.removeChild(el);
-  p.normalize();
+let explainBtn = null;
+
+export function removeExplainButton() {
+  if (explainBtn) {
+    explainBtn.remove();
+    explainBtn = null;
+  }
 }
 
-export function bindGlossEvents(root, { onGloss, hover, getDoc }) {
-  const doc = root.ownerDocument || document;
-  let hoverTimer = null;
-  let mark = null;
-  let hoverWord = "";
-  const win = doc.defaultView || window;
+function showExplainButton(info, onGloss) {
+  removeExplainButton();
+  const range = info.range;
+  const rect = range && range.getBoundingClientRect ? range.getBoundingClientRect() : null;
+  if (!rect || (!rect.width && !rect.height)) return;
 
-  const clearMark = () => {
-    if (mark) {
-      unwrap(mark);
-      mark = null;
-    }
-  };
-
-  const paint = (range, cls) => {
-    clearMark();
-    if (!range) return;
-    try {
-      mark = doc.createElement("span");
-      mark.className = cls;
-      range.surroundContents(mark);
-    } catch {
-      mark = null;
-    }
-  };
-
-  const emitFromPoint = (x, y, { open, requireChange }) => {
-    const info = wordAtPoint(x, y, doc);
-    if (!info) return;
-    paint(info.range, open ? "gloss-active" : "gloss-hover");
-    if (!open) return;
-    if (requireChange && info.word.toLowerCase() === hoverWord) return;
-    hoverWord = info.word.toLowerCase();
+  explainBtn = document.createElement("button");
+  explainBtn.type = "button";
+  explainBtn.className = "cw-explain";
+  explainBtn.textContent = "Explain";
+  explainBtn.addEventListener("mousedown", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    removeExplainButton();
     onGloss(info);
+  });
+  document.body.appendChild(explainBtn);
+
+  const left = Math.min(Math.max(8, rect.left), window.innerWidth - 100);
+  let top = rect.bottom + 8;
+  if (top + 40 > window.innerHeight) top = Math.max(8, rect.top - 44);
+  explainBtn.style.left = `${left}px`;
+  explainBtn.style.top = `${top}px`;
+}
+
+export function bindGlossEvents(root, { onGloss, getDoc }) {
+  const doc = root.ownerDocument || document;
+  const win = doc.defaultView || window;
+  const coarse = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+
+  const onUp = (e) => {
+    if (e.target.closest?.("button, a, input, textarea, .cw-explain")) return;
+    const sel = getDoc ? getDoc().getSelection() : win.getSelection();
+    const selected = selectionInfo(sel);
+    if (selected) {
+      showExplainButton(selected, onGloss);
+      return;
+    }
+    removeExplainButton();
   };
 
   const onClick = (e) => {
-    if (e.target.closest?.("a, button, input, textarea")) return;
-    const sel = (getDoc ? getDoc().getSelection() : win.getSelection());
-    if (selectionInfo(sel, doc)) return;
-    emitFromPoint(e.clientX, e.clientY, { open: true, requireChange: false });
+    if (e.target.closest?.("a, button, input, textarea, .cw-explain")) return;
+    const sel = getDoc ? getDoc().getSelection() : win.getSelection();
+    if (selectionInfo(sel)) return;
+    if (!coarse) return;
+    const info = wordAtPoint(e.clientX, e.clientY, doc);
+    if (info) onGloss(info);
   };
 
-  const onMouseMove = (e) => {
-    if (!hover()) return;
-    if (window.matchMedia && window.matchMedia("(hover: none)").matches) return;
-    clearTimeout(hoverTimer);
-    hoverTimer = setTimeout(
-      () => emitFromPoint(e.clientX, e.clientY, { open: true, requireChange: true }),
-      480
-    );
-  };
-
-  const onMouseOut = (e) => {
-    if (!root.contains(e.relatedTarget)) {
-      clearTimeout(hoverTimer);
-      if (mark && mark.classList.contains("gloss-hover")) clearMark();
-    }
-  };
-
-  const onUp = () => {
-    const sel = (getDoc ? getDoc().getSelection() : win.getSelection());
-    const selected = selectionInfo(sel, doc);
-    if (selected && selected.word.split(" ").length > 1) onGloss(selected);
-  };
-
-  root.addEventListener("click", onClick);
-  root.addEventListener("mousemove", onMouseMove);
-  root.addEventListener("mouseout", onMouseOut);
   root.addEventListener("mouseup", onUp);
   root.addEventListener("touchend", onUp);
+  root.addEventListener("click", onClick);
 
   return () => {
-    clearTimeout(hoverTimer);
-    clearMark();
-    root.removeEventListener("click", onClick);
-    root.removeEventListener("mousemove", onMouseMove);
-    root.removeEventListener("mouseout", onMouseOut);
+    removeExplainButton();
     root.removeEventListener("mouseup", onUp);
     root.removeEventListener("touchend", onUp);
+    root.removeEventListener("click", onClick);
   };
 }
 
@@ -186,9 +171,13 @@ export class Reader {
     this.pdf = null;
     this.book = null;
     this.rendition = null;
+    this.zoom = 1;
+    this._slots = [];
+    this._drawn = new Set();
   }
 
   destroy() {
+    removeExplainButton();
     this.cleanup.forEach((fn) => {
       try {
         fn();
@@ -207,11 +196,19 @@ export class Reader {
     this.rendition = null;
     this.book = null;
     this.pdf = null;
+    this._slots = [];
+    this._drawn = new Set();
     this.stage.innerHTML = "";
+  }
+
+  pageCssWidth() {
+    const w = this.stage.clientWidth || 720;
+    return Math.max(280, Math.floor((w - 36) * this.zoom));
   }
 
   async load({ type, title, text, blob }) {
     this.destroy();
+    this.zoom = 1;
     this.stage.dataset.kind = type;
     if (type === "pdf") return this.loadPdf(blob);
     if (type === "epub") return this.loadEpub(blob);
@@ -224,12 +221,7 @@ export class Reader {
     article.className = "prose";
     article.innerHTML = `${title ? `<header class="prose-kicker">${escapeHtml(title)}</header>` : ""}${textToProse(text)}`;
     this.stage.appendChild(article);
-    this.cleanup.push(
-      bindGlossEvents(article, {
-        onGloss: this.onGloss,
-        hover: () => this.getSettings().hover
-      })
-    );
+    this.cleanup.push(bindGlossEvents(article, { onGloss: this.onGloss }));
   }
 
   async loadDocx(blob) {
@@ -239,12 +231,55 @@ export class Reader {
     article.className = "prose";
     article.innerHTML = result.value || "<p>(Empty document.)</p>";
     this.stage.appendChild(article);
-    this.cleanup.push(
-      bindGlossEvents(article, {
-        onGloss: this.onGloss,
-        hover: () => this.getSettings().hover
-      })
-    );
+    this.cleanup.push(bindGlossEvents(article, { onGloss: this.onGloss }));
+  }
+
+  async _drawPage(slot) {
+    const n = Number(slot.dataset.page);
+    const pdf = this.pdf;
+    const pdfjsLib = window.pdfjsLib;
+    if (!pdf || !pdfjsLib) return;
+    const page = await pdf.getPage(n);
+    const inner = slot.querySelector(".pdf-page-inner");
+    const unscaled = page.getViewport({ scale: 1 });
+    const cssWidth = this.pageCssWidth();
+    const scale = cssWidth / unscaled.width;
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement("canvas");
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.floor(viewport.width * dpr);
+    canvas.height = Math.floor(viewport.height * dpr);
+    canvas.style.width = `${Math.floor(viewport.width)}px`;
+    canvas.style.height = `${Math.floor(viewport.height)}px`;
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const textLayer = document.createElement("div");
+    textLayer.className = "textLayer";
+    textLayer.style.width = `${Math.floor(viewport.width)}px`;
+    textLayer.style.height = `${Math.floor(viewport.height)}px`;
+
+    inner.innerHTML = "";
+    inner.style.width = `${Math.floor(viewport.width)}px`;
+    inner.style.height = `${Math.floor(viewport.height)}px`;
+    inner.appendChild(canvas);
+    inner.appendChild(textLayer);
+    slot.style.minHeight = `${Math.floor(viewport.height)}px`;
+
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    try {
+      const textContent = await page.getTextContent();
+      const task = pdfjsLib.renderTextLayer({
+        textContent,
+        container: textLayer,
+        viewport,
+        textDivs: []
+      });
+      if (task && task.promise) await task.promise;
+    } catch (err) {
+      console.warn("PDF text layer failed", err);
+    }
+    this.cleanup.push(bindGlossEvents(textLayer, { onGloss: this.onGloss }));
   }
 
   async loadPdf(blob) {
@@ -256,67 +291,23 @@ export class Reader {
     scroller.className = "pdf-scroller";
     this.stage.appendChild(scroller);
 
-    const slots = [];
+    this._slots = [];
+    this._drawn = new Set();
     for (let i = 1; i <= pdf.numPages; i += 1) {
       const slot = document.createElement("div");
       slot.className = "pdf-page-slot";
       slot.dataset.page = String(i);
       slot.innerHTML = `<div class="pdf-page-inner"><div class="pdf-skeleton">Page ${i}</div></div>`;
       scroller.appendChild(slot);
-      slots.push(slot);
+      this._slots.push(slot);
     }
 
-    const drawn = new Set();
     const draw = async (slot) => {
       const n = Number(slot.dataset.page);
-      if (drawn.has(n)) return;
-      drawn.add(n);
-      const page = await pdf.getPage(n);
-      const inner = slot.querySelector(".pdf-page-inner");
-      const unscaled = page.getViewport({ scale: 1 });
-      const cssWidth = Math.min(inner.clientWidth || this.stage.clientWidth - 24, 900);
-      const scale = cssWidth / unscaled.width;
-      const viewport = page.getViewport({ scale });
-      const canvas = document.createElement("canvas");
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = Math.floor(viewport.width * dpr);
-      canvas.height = Math.floor(viewport.height * dpr);
-      canvas.style.width = `${viewport.width}px`;
-      canvas.style.height = `${viewport.height}px`;
-      const ctx = canvas.getContext("2d");
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-      const textLayer = document.createElement("div");
-      textLayer.className = "textLayer";
-      textLayer.style.width = `${viewport.width}px`;
-      textLayer.style.height = `${viewport.height}px`;
-
-      inner.innerHTML = "";
-      inner.style.width = `${viewport.width}px`;
-      inner.style.height = `${viewport.height}px`;
-      inner.appendChild(canvas);
-      inner.appendChild(textLayer);
-      slot.style.minHeight = `${viewport.height}px`;
-
-      await page.render({ canvasContext: ctx, viewport }).promise;
-      try {
-        const textContent = await page.getTextContent();
-        const task = pdfjsLib.renderTextLayer({
-          textContent,
-          container: textLayer,
-          viewport,
-          textDivs: []
-        });
-        if (task && task.promise) await task.promise;
-      } catch (err) {
-        console.warn("PDF text layer failed", err);
-      }
-      this.cleanup.push(
-        bindGlossEvents(textLayer, {
-          onGloss: this.onGloss,
-          hover: () => this.getSettings().hover
-        })
-      );
+      const key = `${n}@${this.zoom.toFixed(2)}@${this.pageCssWidth()}`;
+      if (this._drawn.has(key)) return;
+      this._drawn.add(key);
+      await this._drawPage(slot);
     };
 
     const io = new IntersectionObserver(
@@ -325,12 +316,26 @@ export class Reader {
           if (e.isIntersecting) draw(e.target);
         }
       },
-      { root: this.stage, rootMargin: "1200px 0px" }
+      { root: this.stage, rootMargin: "1400px 0px" }
     );
-    slots.forEach((s) => io.observe(s));
+    this._slots.forEach((s) => io.observe(s));
     this.cleanup.push(() => io.disconnect());
-    if (slots[0]) draw(slots[0]);
+    if (this._slots[0]) await draw(this._slots[0]);
+    this._redraw = () => {
+      this._drawn.clear();
+      const vis = this._slots.filter((s) => {
+        const r = s.getBoundingClientRect();
+        const b = this.stage.getBoundingClientRect();
+        return r.bottom > b.top - 400 && r.top < b.bottom + 400;
+      });
+      (vis.length ? vis : this._slots.slice(0, 1)).forEach((s) => draw(s));
+    };
     return { pages: pdf.numPages };
+  }
+
+  setZoom(z) {
+    this.zoom = Math.min(2.4, Math.max(0.7, z));
+    if (this._redraw) this._redraw();
   }
 
   async loadEpub(blob) {
@@ -364,12 +369,11 @@ export class Reader {
       const idoc = view.document;
       if (!idoc) return;
       const style = idoc.createElement("style");
-      style.textContent = `.gloss-hover{background:rgba(240,212,138,.7);} .gloss-active{background:rgba(180,68,46,.22);} ::selection{background:rgba(180,68,46,.28);}`;
+      style.textContent = `::selection{background:rgba(180,68,46,.28);} `;
       idoc.head.appendChild(style);
       this.cleanup.push(
         bindGlossEvents(idoc.body, {
           onGloss: this.onGloss,
-          hover: () => this.getSettings().hover,
           getDoc: () => idoc
         })
       );

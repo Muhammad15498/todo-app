@@ -1,7 +1,7 @@
 import { db, uid } from "./db.js";
 import { SAMPLES } from "./samples.js";
 import { lookup, speak } from "./lookup.js";
-import { Reader, kindFromName, titleFromName } from "./reader.js";
+import { Reader, kindFromName, titleFromName, removeExplainButton } from "./reader.js";
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -10,10 +10,10 @@ const DEFAULTS = {
   theme: "paper",
   fontSize: 20,
   font: "newsreader",
-  hover: true,
+  hover: false,
   lang: "ar",
   geminiKey: "",
-  model: "gemini-2.5-flash"
+  model: "gemini-3.5-flash-lite"
 };
 
 const state = {
@@ -202,8 +202,8 @@ async function ingestPaste(title, text) {
 function emptyPanelHtml() {
   return `
     <div class="panel-empty">
-      <h2>Tap a word.</h2>
-      <p>I’ll tell you what it means <em>here</em> — in this sentence — not in a vacuum. On a computer you can hover; on a phone, tap. Drag to select a phrase.</p>
+      <h2>Highlight a word.</h2>
+      <p>Select 1–4 words, then tap <b>Explain</b>. You’ll get Meaning, Context, and العربي ببساطة in this panel — same as the Chrome extension.</p>
     </div>`;
 }
 
@@ -232,7 +232,7 @@ function closePanel(keepDesktop = false) {
 function renderPanel(data, loading) {
   const el = $("#panelBody");
   if (loading) {
-    el.innerHTML = `<p class="plain"><span class="busy"></span> &nbsp; Looking at “${escapeHtml(loading)}” in this passage…</p>`;
+    el.innerHTML = `<p class="plain"><span class="busy"></span> &nbsp; Understanding “${escapeHtml(loading)}” from the context…</p>`;
     openPanel();
     return;
   }
@@ -421,7 +421,6 @@ function fillSettings() {
   $("#setTheme").value = state.settings.theme;
   $("#setSize").value = state.settings.fontSize;
   $("#setFont").value = state.settings.font;
-  $("#setHover").checked = !!state.settings.hover;
   $("#setLang").value = state.settings.lang;
   $("#setGemini").value = state.settings.geminiKey || "";
 }
@@ -432,7 +431,6 @@ async function saveSettings() {
     theme: $("#setTheme").value,
     fontSize: Number($("#setSize").value),
     font: $("#setFont").value,
-    hover: $("#setHover").checked,
     lang: $("#setLang").value,
     geminiKey: $("#setGemini").value.trim()
   };
@@ -501,7 +499,7 @@ function maybeInstallTip() {
 
 async function boot() {
   const saved = await db.getKV("settings", null);
-  if (saved) state.settings = { ...DEFAULTS, ...saved };
+  if (saved) state.settings = { ...DEFAULTS, ...saved, model: DEFAULTS.model };
   applyTheme();
   syncGeminiBanner();
   await ensureSamples();
@@ -634,6 +632,11 @@ async function boot() {
       closePanel();
     }
   });
+
+  $("#zoomIn")?.addEventListener("click", () => reader.setZoom((reader.zoom || 1) + 0.2));
+  $("#zoomOut")?.addEventListener("click", () => reader.setZoom((reader.zoom || 1) - 0.2));
+  $("#zoomFit")?.addEventListener("click", () => reader.setZoom(1));
+  $("#stage")?.addEventListener("scroll", () => removeExplainButton());
 
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/sw.js").catch(() => {});
