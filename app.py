@@ -1,304 +1,90 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session
-from flask_sqlalchemy import SQLAlchemy
-from datetime import datetime, timedelta
+import json
+import os
+from urllib.error import HTTPError, URLError
+from urllib.parse import quote
+from urllib.request import Request, urlopen
 
-# Function to calculate working days
-def working_days(start_date, end_date):
-    days = (end_date - start_date).days
-    if days <= 0:
-        return 0
-    full_weeks, extra_days = divmod(days, 7)
-    return full_weeks * 5 + min(extra_days, 5)
+from flask import Flask, Response, jsonify, render_template, request, send_from_directory
 
-# Set up Flask and SQLAlchemy
-app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your_secret_key'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
-db = SQLAlchemy(app)
+app = Flask(__name__, static_folder="static", template_folder="templates")
 
-# Template filter to convert date strings to date objects
-@app.template_filter('to_date')
-def to_date_filter(date_str):
-    try:
-        return datetime.strptime(date_str, "%d/%m/%Y").date()
-    except ValueError:
-        return None
 
-# Database Models
-class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(50), unique=True, nullable=False)
-    password = db.Column(db.String(100), nullable=False)
-    tasks = db.relationship('Task', backref='user', lazy=True)
+def _fetch(url, timeout=12):
+    req = Request(
+        url,
+        headers={
+            "User-Agent": "GlossReader/1.0 (contextual reading companion)",
+            "Accept": "application/json",
+        },
+    )
+    with urlopen(req, timeout=timeout) as res:
+        return res.read(), res.status, res.headers.get("Content-Type", "application/json")
 
-class Task(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    task = db.Column(db.String(200), nullable=False)
-    priority = db.Column(db.String(20), nullable=False)
-    status = db.Column(db.String(20), nullable=False, default="In Progress")
-    due_date = db.Column(db.String(20), nullable=False)
-    category = db.Column(db.String(50), nullable=False)
-    creation_date = db.Column(db.String(20), nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    notes = db.relationship('Note', backref='task', lazy=True)
 
-class Note(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    content = db.Column(db.String(500), nullable=False)
-    creation_date = db.Column(db.String(20), nullable=False)
-    last_edit_date = db.Column(db.String(20), nullable=True)
-    task_id = db.Column(db.Integer, db.ForeignKey('task.id'), nullable=False)
-
-# Home Page
-@app.route('/')
+@app.route("/")
 def index():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    user = db.session.get(User, session['user_id'])
-    tasks = Task.query.filter_by(user_id=user.id).all()
-    today = datetime.now().date()
+    return render_template("index.html")
 
-    # Check for tasks that meet the rainbow condition
-    has_rainbow = any(
-        task.status == "In Progress" and
-        task.due_date and
-        to_date_filter(task.due_date) and
-        1 <= (to_date_filter(task.due_date) - today).days <= 7
-        for task in tasks
-    )
 
-    # Get the selected task (if any)
-    selected_task_id = request.args.get('selected_task')
-    selected_task = Task.query.get(selected_task_id) if selected_task_id else None
+@app.route("/health")
+def health():
+    return {"ok": True}
 
-    return render_template(
-        'index.html',
-        tasks=tasks,
-        today=today,
-        working_days=working_days,
-        selected_task=selected_task,
-        has_rainbow=has_rainbow
-    )
 
-# Login
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        user = User.query.filter_by(username=username).first()
-        if user and user.password == password:
-            session['user_id'] = user.id
-            session['password'] = password  # Store password for confirmation
-            return redirect(url_for('index'))
-        else:
-            flash('Invalid username or password!', 'danger')
-    return render_template('login.html')
+@app.route("/sw.js")
+def service_worker():
+    return send_from_directory("static", "sw.js", mimetype="application/javascript")
 
-# Register
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        if User.query.filter_by(username=username).first():
-            flash('Username already exists!', 'danger')
-        else:
-            new_user = User(username=username, password=password)
-            db.session.add(new_user)
-            db.session.commit()
-            flash('Registration successful! Please log in.', 'success')
-            return redirect(url_for('login'))
-    return render_template('register.html')
 
-# Logout
-@app.route('/logout')
-def logout():
-    session.pop('user_id', None)
-    session.pop('password', None)
-    return redirect(url_for('login'))
-
-# Add Task
-@app.route('/add_task', methods=['POST'])
-def add_task():
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-
-    task = request.form['task']
-    priority = request.form['priority'].upper()
-    due_date = request.form['due_date']
-    category = request.form['category']
-
-    # Validate priority
-    priority_map = {"H": "High", "HIGH": "High", "M": "Medium", "MEDIUM": "Medium", "L": "Low", "LOW": "Low"}
-    if priority not in priority_map:
-        flash("Invalid priority! Use H (High), M (Medium), or L (Low).", "warning")
-        return '''
-            <script>
-                alert("Invalid priority! Use H (High), M (Medium), or L (Low).");
-                document.querySelector('input[name="priority"]').focus();
-                window.history.back();
-            </script>
-        '''
-
-    priority = priority_map[priority]
-
-    # Format date
+@app.route("/api/dictionary/<path:word>")
+def dictionary(word):
+    url = "https://api.dictionaryapi.dev/api/v2/entries/en/" + quote(word)
     try:
-        if ' ' in due_date:
-            day, month, year = due_date.split()
-        elif '-' in due_date:
-            day, month, year = due_date.split('-')
-        else:
-            flash("Invalid date format! Use 'dd mm yy', 'dd mm yyyy', 'dd-mm-yy', or 'dd-mm-yyyy'.", "warning")
-            return redirect(url_for('index'))
+        data, status, mime = _fetch(url)
+        return Response(data, status=status, mimetype=mime)
+    except HTTPError as err:
+        return Response(err.read(), status=err.code, mimetype="application/json")
+    except (URLError, TimeoutError, OSError) as err:
+        return jsonify({"error": str(err)}), 502
 
-        if len(year) == 2:
-            year = f"20{year}"
 
-        if not (day.isdigit() and month.isdigit() and year.isdigit()):
-            flash("Invalid date format! Use numbers for day, month, and year.", "warning")
-            return redirect(url_for('index'))
+@app.route("/api/wiki/<path:word>")
+def wiki(word):
+    url = "https://en.wikipedia.org/api/rest_v1/page/summary/" + quote(word)
+    try:
+        data, status, mime = _fetch(url)
+        return Response(data, status=status, mimetype=mime)
+    except HTTPError as err:
+        return Response(err.read(), status=err.code, mimetype="application/json")
+    except (URLError, TimeoutError, OSError) as err:
+        return jsonify({"error": str(err)}), 502
 
-        # Ensure two digits for day and month
-        day = day.zfill(2)
-        month = month.zfill(2)
-        due_date = f"{day}/{month}/{year}"
-    except ValueError:
-        flash("Invalid date format! Use 'dd mm yy', 'dd mm yyyy', 'dd-mm-yy', or 'dd-mm-yyyy'.", "warning")
-        return redirect(url_for('index'))
 
-    # Create a new task
-    new_task = Task(
-        task=task,
-        priority=priority,
-        status="In Progress",  # Default status
-        due_date=due_date,
-        category=category,
-        creation_date=datetime.now().strftime("%d/%m/%Y %I:%M %p"),
-        user_id=session['user_id']
+@app.route("/api/translate")
+def translate():
+    q = (request.args.get("q") or "").strip()
+    lang = (request.args.get("lang") or "en").strip()
+    if not q or lang == "en":
+        return jsonify({"translated": q})
+    url = (
+        "https://api.mymemory.translated.net/get?q="
+        + quote(q[:450])
+        + "&langpair=en|"
+        + quote(lang)
     )
-    db.session.add(new_task)
-    db.session.commit()
+    try:
+        data, *_ = _fetch(url)
+        payload = json.loads(data.decode("utf-8"))
+        translated = (
+            payload.get("responseData", {}).get("translatedText")
+            or payload.get("matches", [{}])[0].get("translation")
+            or ""
+        )
+        return jsonify({"translated": translated})
+    except Exception as err:
+        return jsonify({"translated": "", "error": str(err)}), 502
 
-    flash("Task added successfully!", "success")
-    return redirect(url_for('index'))
 
-# Edit Task
-@app.route('/edit_task/<int:task_id>', methods=['GET', 'POST'])
-def edit_task(task_id):
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    task = Task.query.get_or_404(task_id)
-    if request.method == 'POST':
-        task.task = request.form['task']
-        task.priority = request.form['priority']
-        task.due_date = request.form['due_date']
-        task.category = request.form['category']
-        db.session.commit()
-        flash('Task updated successfully!', 'success')
-        return redirect(url_for('index'))
-    return render_template('edit_task.html', task=task)
-
-# Delete Task
-@app.route('/delete_task/<int:task_id>')
-def delete_task(task_id):
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    task = Task.query.get_or_404(task_id)
-    # Delete all notes associated with the task
-    Note.query.filter_by(task_id=task_id).delete()
-    db.session.delete(task)
-    db.session.commit()
-    flash('Task deleted successfully!', 'success')
-    return redirect(url_for('index'))
-
-# Complete Task
-@app.route('/complete_task/<int:task_id>')
-def complete_task(task_id):
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    task = Task.query.get_or_404(task_id)
-    task.status = "Completed"
-    # Add a note for completion
-    new_note = Note(
-        content=f"Task completed on {datetime.now().strftime('%d/%m/%Y %I:%M %p')}",
-        creation_date=datetime.now().strftime("%d/%m/%Y %I:%M %p"),
-        task_id=task_id
-    )
-    db.session.add(new_note)
-    db.session.commit()
-    flash('Task marked as completed!', 'success')
-    return redirect(url_for('index'))
-
-# Revert Task to In Progress
-@app.route('/revert_task/<int:task_id>')
-def revert_task(task_id):
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    task = Task.query.get_or_404(task_id)
-    task.status = "In Progress"
-    # Add a note for reverting
-    new_note = Note(
-        content=f"Task reverted to In Progress on {datetime.now().strftime('%d/%m/%Y %I:%M %p')}",
-        creation_date=datetime.now().strftime("%d/%m/%Y %I:%M %p"),
-        task_id=task_id
-    )
-    db.session.add(new_note)
-    db.session.commit()
-    flash('Task reverted to In Progress!', 'success')
-    return redirect(url_for('index'))
-
-# Add Note
-@app.route('/add_note/<int:task_id>', methods=['POST'])
-def add_note(task_id):
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    content = request.form['note']
-    new_note = Note(
-        content=content,
-        creation_date=datetime.now().strftime("%d/%m/%Y %I:%M %p"),
-        task_id=task_id
-    )
-    db.session.add(new_note)
-    db.session.commit()
-    flash('Note added successfully!', 'success')
-    return redirect(url_for('index', selected_task=task_id))
-
-# Edit Note
-@app.route('/edit_note/<int:note_id>', methods=['GET', 'POST'])
-def edit_note(note_id):
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    note = Note.query.get_or_404(note_id)
-    if "Task completed" in note.content or "Task reverted" in note.content:
-        flash('Completed or reverted notes cannot be edited!', 'danger')
-        return redirect(url_for('index', selected_task=note.task_id))
-    if request.method == 'POST':
-        note.content = request.form['note']
-        note.last_edit_date = datetime.now().strftime("%d/%m/%Y %I:%M %p")
-        db.session.commit()
-        flash('Note updated successfully!', 'success')
-        return redirect(url_for('index', selected_task=note.task_id))
-    return render_template('edit_note.html', note=note)
-
-# Delete Note
-@app.route('/delete_note/<int:note_id>')
-def delete_note(note_id):
-    if 'user_id' not in session:
-        return redirect(url_for('login'))
-    note = Note.query.get_or_404(note_id)
-    if "Task completed" in note.content or "Task reverted" in note.content:
-        flash('Completed or reverted notes cannot be deleted!', 'danger')
-        return redirect(url_for('index', selected_task=note.task_id))
-    task_id = note.task_id
-    db.session.delete(note)
-    db.session.commit()
-    flash('Note deleted successfully!', 'success')
-    return redirect(url_for('index', selected_task=task_id))
-
-# Run the app
-if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()  # Create the database and tables
-    app.run(host='0.0.0.0', port=5000, debug=True)  # Use 0.0.0.0 for external access
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
