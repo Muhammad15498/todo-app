@@ -225,6 +225,60 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/epubjs@0.3.93/dist/epub.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js"></script>
-  <script type="module" src="{{ url_for('static', filename='js/app.js') }}?v=5"></script>
+  <script>
+    (function () {
+      function keyFromBox() {
+        var box = document.getElementById("bannerKey");
+        var set = document.getElementById("setGemini");
+        return ((box && box.value) || (set && set.value) || localStorage.getItem("cw-gemini") || "").trim();
+      }
+      function toast(msg) {
+        var el = document.getElementById("toast");
+        if (!el) { alert(msg); return; }
+        el.textContent = msg;
+        el.classList.add("show");
+        setTimeout(function () { el.classList.remove("show"); }, 3000);
+      }
+      window.cwSaveKey = function () {
+        var key = keyFromBox();
+        if (!key) { toast("Paste the Gemini key first."); return; }
+        try { localStorage.setItem("cw-gemini", key); } catch (e) {}
+        toast("Key saved.");
+      };
+      window.cwTestKey = async function () {
+        var key = keyFromBox();
+        if (!key) { toast("Paste the Gemini key first."); return; }
+        toast("Testing Gemini…");
+        try {
+          var res = await fetch(
+            "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=" +
+              encodeURIComponent(key),
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ contents: [{ parts: [{ text: "Reply with the single word: OK" }] }] })
+            }
+          );
+          var data = await res.json();
+          if (!res.ok) {
+            toast("Gemini failed: " + ((data.error && data.error.message) || res.status));
+            return;
+          }
+          var part = data.candidates && data.candidates[0] && data.candidates[0].content &&
+            data.candidates[0].content.parts && data.candidates[0].content.parts[0];
+          toast("Gemini works: " + String((part && part.text) || "OK").slice(0, 40));
+        } catch (err) {
+          toast("Gemini blocked in this window: " + (err.message || "network"));
+        }
+      };
+      document.addEventListener("click", function (e) {
+        var t = e.target;
+        if (!t || !t.id) return;
+        if (t.id === "bannerSave") window.cwSaveKey();
+        if (t.id === "bannerTest" || t.id === "setTest") window.cwTestKey();
+      });
+    })();
+  </script>
+  <script type="module" src="{{ url_for('static', filename='js/app.js') }}?v=6"></script>
 </body>
 </html>
