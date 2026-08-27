@@ -363,7 +363,10 @@ async function gloss(info) {
       query: info.word,
       sentence: info.sentence,
       passage: info.passage,
-      settings: state.settings
+      settings: {
+        ...state.settings,
+        geminiKey: state.settings.geminiKey || localStorage.getItem("cw-gemini") || ""
+      }
     });
     if (token !== state.lookupToken) return;
     state.lastGloss = { ...data, docId: state.current?.id, docTitle: state.current?.title };
@@ -436,7 +439,8 @@ async function saveSettings() {
     lang: $("#setLang").value,
     geminiKey: $("#setGemini").value.trim()
   };
-  await db.setKV("settings", state.settings);
+  persistLocalSettings();
+  db.setKV("settings", state.settings).catch(() => {});
   applyTheme();
   toast("Settings saved");
   syncGeminiBanner();
@@ -447,6 +451,7 @@ function showModal(id, on) {
 }
 
 function setupDrop(zone) {
+  if (!zone) return;
   ["dragenter", "dragover"].forEach((ev) => {
     zone.addEventListener(ev, (e) => {
       e.preventDefault();
@@ -465,6 +470,7 @@ function setupDrop(zone) {
 function setupSheetDrag() {
   const panel = $("#panel");
   const handle = $("#panelHandle");
+  if (!panel || !handle) return;
   let startY = 0;
   handle.addEventListener("touchstart", (e) => {
     startY = e.touches[0].clientY;
@@ -499,13 +505,31 @@ function maybeInstallTip() {
   }
 }
 
+function loadLocalSettings() {
+  try {
+    const raw = localStorage.getItem("cw-settings");
+    if (raw) Object.assign(state.settings, JSON.parse(raw));
+    const key = localStorage.getItem("cw-gemini");
+    if (key) state.settings.geminiKey = key;
+  } catch {
+    /* ignore */
+  }
+  state.settings.model = DEFAULTS.model;
+}
+
+function persistLocalSettings() {
+  try {
+    localStorage.setItem("cw-settings", JSON.stringify(state.settings));
+    if (state.settings.geminiKey) localStorage.setItem("cw-gemini", state.settings.geminiKey);
+  } catch {
+    /* ignore */
+  }
+}
+
 async function boot() {
-  const saved = await db.getKV("settings", null);
-  if (saved) state.settings = { ...DEFAULTS, ...saved, model: DEFAULTS.model };
+  loadLocalSettings();
   applyTheme();
   syncGeminiBanner();
-  await ensureSamples();
-  await refreshLibrary();
 
   reader = new Reader({
     stage: $("#stage"),
@@ -617,13 +641,12 @@ async function boot() {
   });
   maybeInstallTip();
 
-  $("#bannerSave")?.addEventListener("click", async () => {
-    const key = $("#bannerKey").value.trim();
-    if (!key) return toast("Paste the Gemini key first.");
+  $("#bannerSave")?.addEventListener("click", () => {
+    const key = ($("#bannerKey").value || "").trim() || localStorage.getItem("cw-gemini") || "";
+    if (!key) return;
     state.settings.geminiKey = key;
-    await db.setKV("settings", state.settings);
+    persistLocalSettings();
     syncGeminiBanner();
-    toast("Gemini key saved");
   });
 
   async function runGeminiTest(key) {
@@ -658,8 +681,16 @@ async function boot() {
   $("#stage")?.addEventListener("scroll", () => removeExplainButton());
 
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("/sw.js").catch(() => {});
+    navigator.serviceWorker.getRegistrations().then((rs) => rs.forEach((r) => r.unregister()));
+    if (window.caches) caches.keys().then((keys) => keys.forEach((k) => caches.delete(k)));
   }
+
+  ensureSamples().then(() => refreshLibrary()).catch(() => {
+    const shelf = $("#shelf");
+    if (shelf && !shelf.innerHTML.trim()) {
+      shelf.innerHTML = `<div class="empty-shelf">Open a PDF to start. Samples need a second to load.</div>`;
+    }
+  });
 }
 
 boot().catch((err) => {
