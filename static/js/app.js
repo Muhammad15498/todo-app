@@ -57,6 +57,7 @@ function showView(name) {
   $("#view-reader").classList.toggle("hidden", name !== "reader");
   $("#view-vocab").classList.toggle("hidden", name !== "vocab");
   $("#topbar").classList.toggle("hidden", name === "reader");
+  document.body.classList.toggle("cw-reading", name === "reader");
   if (name !== "reader") closePanel();
   removeExplainButton();
 }
@@ -315,12 +316,17 @@ function renderPanel(data, loading) {
       }
     `;
 
+  const sounds = (coach && coach["Sounds Like"] && coach["Sounds Like"].trim()) || data.phonetic || "";
   el.innerHTML = `
-    <h2 class="headword">${escapeHtml(data.headword || data.query)}</h2>
+    <div class="headword-row">
+      <h2 class="headword">${escapeHtml(data.headword || data.query)}</h2>
+      <button class="icon-btn speak-btn" id="speakWord" type="button" aria-label="Pronounce">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5z"/><path d="M16 8.5a5 5 0 0 1 0 7"/><path d="M18.5 6a8.5 8.5 0 0 1 0 12"/></svg>
+      </button>
+    </div>
     <div class="meta-row">
-      ${data.phonetic ? `<span class="phonetic">${escapeHtml(data.phonetic)}</span>` : ""}
+      ${sounds ? `<span class="phonetic">${escapeHtml(sounds)}</span>` : ""}
       ${pos ? `<span class="pos">${escapeHtml(pos)}</span>` : ""}
-      <button class="ghost-btn" id="speakWord" type="button">Listen</button>
     </div>
     ${coachHtml}
     <div class="panel-actions">

@@ -55,6 +55,15 @@ body {
   font-family: var(--font-ui);
   letter-spacing: 0.01em;
 }
+body.cw-reading {
+  overflow: hidden;
+  height: 100dvh;
+}
+body.cw-reading .app {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
 
 body::before {
   content: "";
@@ -76,6 +85,7 @@ a { color: var(--accent); }
   position: sticky;
   top: 0;
   z-index: 90;
+  flex-shrink: 0;
   background: #b4442e;
   color: #faf6ee;
   text-align: center;
@@ -373,13 +383,21 @@ a { color: var(--accent); }
 .tip p { margin: 0; color: var(--ink-soft); font-size: 0.9rem; line-height: 1.45; }
 
 /* —— Reader —— */
-#view-reader { height: 100dvh; }
+#view-reader {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
 .reader {
   display: grid;
-  grid-template-columns: 1fr var(--panel-w);
-  grid-template-rows: auto 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, var(--panel-w));
+  grid-template-rows: auto minmax(0, 1fr);
+  flex: 1;
   height: 100%;
-  min-height: 100dvh;
+  min-height: 0;
   overflow: hidden;
 }
 .reader-bar {
@@ -536,6 +554,9 @@ a { color: var(--accent); }
   display: flex;
   flex-direction: column;
   min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
   position: relative;
 }
 .panel-handle {
@@ -577,13 +598,23 @@ a { color: var(--accent); }
 }
 .panel-empty p { color: var(--ink-soft); line-height: 1.5; }
 
+.headword-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+}
 .headword {
   font-family: var(--font-display);
   font-optical-sizing: auto;
-  font-size: clamp(2.1rem, 4vw, 3.1rem);
+  font-size: clamp(1.7rem, 3.4vw, 2.6rem);
   letter-spacing: -0.04em;
   line-height: 0.95;
   margin: 0.15rem 0 0.35rem;
+  flex: 1;
+}
+.speak-btn {
+  flex-shrink: 0;
+  margin-top: 0.15rem;
 }
 .phonetic {
   color: var(--ink-soft);
@@ -657,13 +688,13 @@ a { color: var(--accent); }
 .phrase-chip span { color: var(--ink-soft); font-size: 0.88rem; }
 
 .translation {
-  font-size: 1.05rem;
+  font-size: 1.15rem;
   line-height: 1.5;
   padding: 0.7rem 0.8rem;
   background: color-mix(in srgb, var(--accent-2) 12%, var(--panel));
   border-radius: 10px;
+  direction: rtl;
 }
-.translation[dir="rtl"] { font-size: 1.15rem; }
 
 .panel-actions {
   display: flex;

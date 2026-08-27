@@ -52,6 +52,7 @@
     if (reader) reader.classList.toggle("hidden", name !== "reader");
     if (vocab) vocab.classList.toggle("hidden", name !== "vocab");
     if (top) top.classList.toggle("hidden", name === "reader");
+    document.body.classList.toggle("cw-reading", name === "reader");
   }
 
   function escapeHtml(s) {
@@ -165,8 +166,12 @@
 
   function parseCoach(text) {
     var result = {
+      "Sounds Like": "",
       Meaning: "",
       Context: "",
+      "In Real Life": "",
+      "Picture It": "",
+      "For Instance": "",
       Arabic: "",
       "When To Use It": "",
       "Don't Confuse": "",
@@ -255,21 +260,43 @@
         data.candidates[0].content.parts[0] &&
         data.candidates[0].content.parts[0].text;
       var coach = parseCoach(raw);
+      function block(title, text, cls) {
+        if (!text || !String(text).trim()) return "";
+        return (
+          '<div class="block"><h3>' +
+          title +
+          "</h3><p class=\"" +
+          (cls || "plain") +
+          '">' +
+          escapeHtml(text) +
+          "</p></div>"
+        );
+      }
       body.innerHTML =
-        '<h2 class="headword">' +
+        '<div class="headword-row"><h2 class="headword">' +
         escapeHtml(info.word) +
-        "</h2>" +
-        (coach.Meaning
-          ? '<div class="block"><h3>Meaning</h3><p class="plain">' + escapeHtml(coach.Meaning) + "</p></div>"
+        '</h2><button class="icon-btn speak-btn" id="speakWord" type="button" aria-label="Pronounce"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 5L6 9H3v6h3l5 4V5z"/><path d="M16 8.5a5 5 0 0 1 0 7"/><path d="M18.5 6a8.5 8.5 0 0 1 0 12"/></svg></button></div>' +
+        (coach["Sounds Like"]
+          ? '<div class="meta-row"><span class="phonetic">' + escapeHtml(coach["Sounds Like"]) + "</span></div>"
           : "") +
-        (coach.Context
-          ? '<div class="block"><h3>Context</h3><p class="plain">' + escapeHtml(coach.Context) + "</p></div>"
-          : "") +
-        (coach.Arabic
-          ? '<div class="block"><h3>العربي ببساطة</h3><p class="translation" dir="rtl">' +
-            escapeHtml(coach.Arabic) +
-            "</p></div>"
-          : "");
+        block("Meaning", coach.Meaning) +
+        block("In this sentence", coach.Context) +
+        block("In real life", coach["In Real Life"]) +
+        block("Picture it", coach["Picture It"]) +
+        block("For instance", coach["For Instance"]) +
+        block("العربي ببساطة", coach.Arabic, "translation") +
+        block("When to use it", coach["When To Use It"]) +
+        block("Examples", coach.Examples, "sentence");
+      var speakBtn = el("speakWord");
+      if (speakBtn) {
+        speakBtn.onclick = function () {
+          if (!window.speechSynthesis) return;
+          window.speechSynthesis.cancel();
+          var u = new SpeechSynthesisUtterance(info.word);
+          u.lang = "en-US";
+          window.speechSynthesis.speak(u);
+        };
+      }
     } catch (err) {
       body.innerHTML =
         '<p class="hint">Could not reach Gemini in this window. Open the preview in a new tab.</p>';
@@ -600,6 +627,6 @@
   ready(function () {
     wireFile();
     bindHighlightWatch();
-    say("Context Word · build 9 · highlight a word");
+    say("Context Word · build 10 · sidebar stays put");
   });
 })();

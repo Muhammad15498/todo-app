@@ -49,6 +49,8 @@ The learner highlighted:
 
 The learner wants to understand the highlighted text mainly THROUGH ITS CONTEXT.
 
+A dictionary gloss is not enough. After reading you, they should know: what it means here, what it is in real life, and how to picture it.
+
 CONTEXT:
 
 Immediate text:
@@ -81,61 +83,59 @@ Do not explain a difficult word using another difficult word.
 
 The learner should NOT need to look up words inside your explanation.
 
-Prefer "accept that something is true" over "acknowledge something".
+Prefer "the way people act" over "conduct". Prefer "things people do" over "behaviours" if you are explaining "behaviours".
 
 Make the meaning obvious from the situation.
 
 RETURN ONLY THESE SECTIONS:
 
+Sounds Like:
+
+How to say it, in simple pieces. Example: bih-HAY-vyorz
+
 Meaning:
 
-Very short and simple meaning.
+One short, simple meaning of the word itself. What IS this thing in the world? If it is abstract, make it physical: what would you see, hear, or do?
 
 Context:
 
-Explain exactly what the writer means HERE.
+Explain exactly what the writer means HERE. This is the MOST IMPORTANT section. Connect the word to this sentence so the learner cannot miss it.
 
-This is the MOST IMPORTANT section.
+In Real Life:
 
-Make the connection between the word and the surrounding situation very clear.
+What this looks like outside the book. Everyday. Concrete. For "behaviours": the things people actually do — shouting, sharing, hiding, helping — not a theory. 2 short sentences.
 
-If necessary, explain the relevant part of the sentence in simple English.
+Picture It:
+
+One image the learner can close their eyes and see. If the word is abstract, invent a small scene.
+
+For Instance:
+
+Two everyday "such as..." cases, not copied from the passage. Start with "such as".
 
 Arabic:
 
-Explain the SAME contextual meaning in simple Egyptian-friendly Arabic.
-
-Do not translate word-for-word.
-
-Explain it naturally as: "هو هنا قصده كذا..."
+The SAME contextual meaning in simple Egyptian-friendly Arabic, as: "هو هنا قصده كذا..."
 
 When To Use It:
 
-Briefly explain when a native speaker naturally uses this word or expression.
-
-Only 1–2 short sentences.
+When a native speaker naturally says this. 1–2 short sentences.
 
 Don't Confuse:
 
-Only include this if ONE similar word or expression could genuinely confuse the learner.
-
-Otherwise leave it empty.
+Only if ONE similar word could genuinely confuse the learner. Otherwise leave empty.
 
 Examples:
 
-Give TWO short, natural examples.
-
-Keep them simple.
+TWO short natural sentences using the word.
 
 The Idea:
 
-Give ONE short memorable idea only if useful.
+ONE short memorable idea only if useful.
 
 STRICT RULES:
 
-Context is the priority.
-
-Do not give a generic dictionary explanation when the context gives a clear meaning.
+Context is the priority, but In Real Life and Picture It must still be concrete.
 
 Do not make the explanation complicated.
 
@@ -151,8 +151,12 @@ Do not repeat yourself.
 
 Use exactly:
 
+Sounds Like:
 Meaning:
 Context:
+In Real Life:
+Picture It:
+For Instance:
 Arabic:
 When To Use It:
 Don't Confuse:
@@ -163,8 +167,12 @@ The Idea:
 
 export function parseCoach(text) {
   const result = {
+    "Sounds Like": "",
     Meaning: "",
     Context: "",
+    "In Real Life": "",
+    "Picture It": "",
+    "For Instance": "",
     Arabic: "",
     "When To Use It": "",
     "Don't Confuse": "",
@@ -172,8 +180,12 @@ export function parseCoach(text) {
     "The Idea": ""
   };
   const headings = [
+    "Sounds Like:",
     "Meaning:",
     "Context:",
+    "In Real Life:",
+    "Picture It:",
+    "For Instance:",
     "Arabic:",
     "When To Use It:",
     "Don't Confuse:",
