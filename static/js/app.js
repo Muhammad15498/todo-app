@@ -107,17 +107,17 @@ function escapeHtml(s) {
 
 async function ensureSamples() {
   const existing = await db.allDocs();
-  const have = new Set(existing.map((d) => d.id));
+  const have = new Map(existing.map((d) => [d.id, d]));
   for (const s of SAMPLES) {
-    if (have.has(s.id)) continue;
+    const prev = have.get(s.id);
     await db.putDoc({
       id: s.id,
       title: s.title,
       type: "sample",
       blurb: s.blurb,
       builtin: true,
-      addedAt: Date.now(),
-      lastOpened: 0,
+      addedAt: prev?.addedAt || Date.now(),
+      lastOpened: prev?.lastOpened || 0,
       text: s.body
     });
   }
@@ -247,7 +247,7 @@ function renderPanel(data, loading) {
     data.ai?.plain ||
     data.contextual?.definition ||
     data.wiki?.extract ||
-    "I could not find a dictionary entry for this. Try selecting a slightly shorter phrase, or add an AI key in Settings for a contextual guess.";
+    "I could not find a dictionary entry for this. Try a slightly shorter phrase, or check the spelling.";
 
   const pos = data.ai?.pos || data.contextual?.pos || "";
   const senses = (data.meanings || []).slice(0, 8);
@@ -411,10 +411,6 @@ function fillSettings() {
   $("#setFont").value = state.settings.font;
   $("#setHover").checked = !!state.settings.hover;
   $("#setLang").value = state.settings.lang;
-  $("#setAi").checked = !!state.settings.ai;
-  $("#setKey").value = state.settings.apiKey;
-  $("#setModel").value = state.settings.model;
-  $("#setBase").value = state.settings.baseUrl;
 }
 
 async function saveSettings() {
@@ -425,27 +421,11 @@ async function saveSettings() {
     font: $("#setFont").value,
     hover: $("#setHover").checked,
     lang: $("#setLang").value,
-    ai: $("#setAi").checked,
-    apiKey: $("#setKey").value.trim(),
-    model: $("#setModel").value.trim() || "gpt-4o-mini",
-    baseUrl: $("#setBase").value.trim() || "https://api.openai.com/v1"
+    ai: false
   };
   await db.setKV("settings", state.settings);
   applyTheme();
   toast("Settings saved");
-}
-
-function providerPreset(name) {
-  if (name === "openai") {
-    $("#setBase").value = "https://api.openai.com/v1";
-    $("#setModel").value = "gpt-4o-mini";
-  } else if (name === "groq") {
-    $("#setBase").value = "https://api.groq.com/openai/v1";
-    $("#setModel").value = "llama-3.3-70b-versatile";
-  } else if (name === "openrouter") {
-    $("#setBase").value = "https://openrouter.ai/api/v1";
-    $("#setModel").value = "openai/gpt-4o-mini";
-  }
 }
 
 function showModal(id, on) {
@@ -601,7 +581,6 @@ async function boot() {
   $("#settingsModal").addEventListener("click", (e) => {
     if (e.target.id === "settingsModal") showModal("#settingsModal", false);
   });
-  $$("[data-preset]").forEach((b) => b.addEventListener("click", () => providerPreset(b.dataset.preset)));
 
   $("#panelClose").addEventListener("click", () => closePanel());
   $("#scrim").addEventListener("click", () => closePanel());

@@ -18,7 +18,7 @@ A last piece of advice: do not stop to gloss every word. Read for the music of t
 
 You can also select a whole phrase. Try highlighting “in a vacuum” or “the company they keep” and watch how Gloss treats them as a unit, not as stray parts.
 
-If you add an optional AI key in Settings, the panel becomes even more precise: it will explain tone, register, and why the author chose this word rather than a simpler one. Without a key, the built-in dictionary still ranks senses against the passage you are reading. Either way, the book stays on your device.`
+Gloss is free. No account, no key, no subscription. A public dictionary is ranked against the sentence you are in. The book never leaves this device.`
   },
   {
     id: "sample-bank",

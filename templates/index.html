@@ -41,7 +41,7 @@
       <div class="hero">
         <div>
           <h1>Read it.<br><em>Then understand it.</em></h1>
-          <p class="lede">Open a PDF, an EPUB, a Word file, or anything you pasted. Tap a word — or a phrase — and Gloss tells you what it means <em>in this sentence</em>, not in a vacuum.</p>
+          <p class="lede">Open a PDF, an EPUB, a Word file, or anything you pasted. Tap a word — or a phrase — and Gloss tells you what it means <em>in this sentence</em>, not in a vacuum. Free. No account. No key.</p>
           <div class="hero-actions">
             <button class="primary-btn" id="openFile" type="button">Open a file</button>
             <button class="ghost-btn" id="btnPaste" type="button">Paste text</button>
@@ -192,31 +192,7 @@
           <option value="ru">Russian</option>
         </select>
       </div>
-      <h2 style="font-size:1.4rem;margin-top:1rem">Optional AI</h2>
-      <p class="hint">Works without a key — the dictionary already picks the sense that fits the passage. A key makes the “in this context” line warmer and more precise.</p>
-      <div class="field">
-        <label><input id="setAi" type="checkbox"> Use an AI key for contextual explanations</label>
-      </div>
-      <div class="field">
-        <label>Provider presets</label>
-        <div class="hero-actions">
-          <button class="ghost-btn" type="button" data-preset="openai">OpenAI</button>
-          <button class="ghost-btn" type="button" data-preset="groq">Groq</button>
-          <button class="ghost-btn" type="button" data-preset="openrouter">OpenRouter</button>
-        </div>
-      </div>
-      <div class="field">
-        <label for="setBase">API base URL</label>
-        <input id="setBase" placeholder="https://api.openai.com/v1">
-      </div>
-      <div class="field">
-        <label for="setModel">Model</label>
-        <input id="setModel" placeholder="gpt-4o-mini">
-      </div>
-      <div class="field">
-        <label for="setKey">API key (stored only on this device)</label>
-        <input id="setKey" type="password" autocomplete="off" placeholder="sk-…">
-      </div>
+      <p class="hint">Gloss is free. Meanings come from a public dictionary, then the sense that fits <em>this</em> sentence is shown first. You can optionally translate that meaning into your language — still free.</p>
       <div class="modal-actions">
         <button class="ghost-btn" id="setCancel" type="button">Close</button>
         <button class="primary-btn" id="setSave" type="button">Save</button>
