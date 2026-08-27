@@ -1,7 +1,7 @@
 {
-  "name": "Gloss",
-  "short_name": "Gloss",
-  "description": "Read PDFs, EPUBs and notes. Tap a word, get the meaning in context.",
+  "name": "Context Word",
+  "short_name": "Context Word",
+  "description": "Phone reader for PDFs and books. Tap a word, understand it from the sentence.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

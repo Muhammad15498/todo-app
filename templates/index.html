@@ -4,11 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#F3EBDD">
-  <meta name="description" content="Gloss — read PDFs, EPUBs and notes. Tap a word, get the meaning in context.">
+  <meta name="description" content="Context Word — a phone reader for PDFs and books. Tap a word, understand it from the sentence.">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="Gloss">
-  <title>Gloss — read, then understand</title>
+  <meta name="apple-mobile-web-app-title" content="Context Word">
+  <title>Context Word — read, then understand</title>
   <link rel="icon" href="{{ url_for('static', filename='img/favicon.svg') }}" type="image/svg+xml">
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/icon.png') }}">
   <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
@@ -20,9 +21,9 @@
 <body>
   <div class="app">
     <header class="topbar" id="topbar">
-      <button class="brand" id="brand" type="button" aria-label="Gloss home">
+      <button class="brand" id="brand" type="button" aria-label="Context Word home">
         <img class="brand-mark" src="{{ url_for('static', filename='img/icon.png') }}" alt="">
-        <span class="brand-name">Gloss</span>
+        <span class="brand-name">Context Word</span>
       </button>
       <div class="top-actions">
         <button class="text-btn" id="btnVocab" type="button">Notebook</button>
@@ -32,18 +33,30 @@
       </div>
     </header>
 
-    <div class="ios-tip hidden" id="iosTip">
-      <span>On iPhone: tap Share, then <b>Add to Home Screen</b> — Gloss opens like an app.</span>
-      <button class="text-btn" id="iosDismiss" type="button">Got it</button>
+    <div class="ios-tip hidden" id="installTip">
+      <span id="installTipText">On Android Chrome: menu → <b>Add to Home screen</b>. It opens like a PDF app.</span>
+      <button class="text-btn" id="installDismiss" type="button">Got it</button>
     </div>
 
     <section class="view library" id="view-library">
+      <div class="setup-card" id="geminiBanner">
+        <div>
+          <div class="drop-kicker">Same engine as your extension</div>
+          <h2>Paste your Gemini key once.</h2>
+          <p>Then tap a word in a PDF and you’ll get Meaning, Context, and العربي ببساطة — in a side panel, not a popup.</p>
+        </div>
+        <div class="setup-row">
+          <input id="bannerKey" type="password" autocomplete="off" placeholder="Gemini API key">
+          <button class="primary-btn" id="bannerSave" type="button">Save key</button>
+        </div>
+        <p class="hint" style="margin:0.6rem 0 0">Free from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>. Stored on this phone only.</p>
+      </div>
       <div class="hero">
         <div>
-          <h1>Read it.<br><em>Then understand it.</em></h1>
-          <p class="lede">Open a PDF, an EPUB, a Word file, or anything you pasted. Tap a word — or a phrase — and Gloss tells you what it means <em>in this sentence</em>, not in a vacuum. Free. No account. No key.</p>
+          <h1>Your reader.<br><em>On the phone.</em></h1>
+          <p class="lede">Open a PDF, EPUB, Word file, or pasted text. Tap a word — or select a short phrase — and Context Word explains it <em>from this sentence</em>, with Arabic, the way your Chrome extension does. The meaning sits in the margin, so the page stays put.</p>
           <div class="hero-actions">
-            <button class="primary-btn" id="openFile" type="button">Open a file</button>
+            <button class="primary-btn" id="openFile" type="button">Open a PDF or book</button>
             <button class="ghost-btn" id="btnPaste" type="button">Paste text</button>
           </div>
         </div>
@@ -72,15 +85,15 @@
       <div class="tips">
         <div class="tip">
           <h3>Side panel, not a popup</h3>
-          <p>The meaning stays beside the page, so you never lose the sentence you were in.</p>
+          <p>Meaning, Context, Arabic — the same sections as the extension, parked beside the page.</p>
         </div>
         <div class="tip">
-          <h3>Phones don’t hover</h3>
-          <p>Tap a word. Drag to select a phrase. That is the whole gesture.</p>
+          <h3>Built for Android</h3>
+          <p>Tap a word. Select a short phrase. Add to Home screen and it behaves like a reader app.</p>
         </div>
         <div class="tip">
-          <h3>Context first</h3>
-          <p>If a word has five meanings, the one that fits this passage is shown first.</p>
+          <h3>PDFs and books</h3>
+          <p>The Chrome extension cannot run inside a PDF. This can.</p>
         </div>
       </div>
     </section>
@@ -99,7 +112,7 @@
         <aside class="panel" id="panel" aria-live="polite">
           <div class="panel-handle" id="panelHandle"></div>
           <div class="panel-head">
-            <div class="panel-kicker">In the margin</div>
+            <div class="panel-kicker">Context Word</div>
             <button class="icon-btn panel-close-mobile" id="panelClose" type="button" aria-label="Close">×</button>
           </div>
           <div class="panel-body" id="panelBody"></div>
@@ -140,7 +153,7 @@
       </div>
       <div class="modal-actions">
         <button class="ghost-btn" id="pasteCancel" type="button">Cancel</button>
-        <button class="primary-btn" id="pasteSave" type="button">Open in Gloss</button>
+        <button class="primary-btn" id="pasteSave" type="button">Open to read</button>
       </div>
     </div>
   </div>
@@ -171,7 +184,7 @@
         </select>
       </div>
       <div class="field">
-        <label><input id="setHover" type="checkbox"> Gloss on hover (computers only)</label>
+        <label><input id="setHover" type="checkbox"> Explain on hover (computers only)</label>
       </div>
       <div class="field">
         <label for="setLang">Translate the meaning into</label>

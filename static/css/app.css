@@ -161,8 +161,9 @@ a { color: var(--accent); }
 .library {
   max-width: 1080px;
   margin: 0 auto;
-  padding: 2.4rem 1.25rem 5rem;
+  padding: 1.4rem 1.25rem 5rem;
 }
+.library .setup-card { margin-left: 0; margin-right: 0; max-width: none; }
 
 .hero {
   display: grid;
@@ -715,6 +716,37 @@ a { color: var(--accent); }
   gap: 0.8rem;
   align-items: center;
   font-size: 0.88rem;
+}
+
+.setup-card {
+  max-width: 1080px;
+  margin: 0 auto 1.6rem;
+  padding: 1.15rem 1.2rem 1.2rem;
+  border: 1px solid var(--rule);
+  border-radius: 16px;
+  background: var(--panel);
+  border-left: 7px solid var(--accent);
+}
+.setup-card h2 {
+  font-family: var(--font-display);
+  letter-spacing: -0.03em;
+  margin: 0.25rem 0 0.35rem;
+  font-size: 1.55rem;
+}
+.setup-card p { margin: 0; color: var(--ink-soft); }
+.setup-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
+  flex-wrap: wrap;
+}
+.setup-row input {
+  flex: 1;
+  min-width: 12rem;
+  border: 1px solid var(--rule);
+  background: var(--paper);
+  border-radius: 10px;
+  padding: 0.65rem 0.75rem;
 }
 
 .busy {

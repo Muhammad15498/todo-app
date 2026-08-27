@@ -439,6 +439,7 @@ async function saveSettings() {
   await db.setKV("settings", state.settings);
   applyTheme();
   toast("Settings saved");
+  syncGeminiBanner();
 }
 
 function showModal(id, on) {
@@ -479,12 +480,22 @@ function setupSheetDrag() {
   });
 }
 
-function maybeIosTip() {
+function syncGeminiBanner() {
+  const has = !!(state.settings.geminiKey && state.settings.geminiKey.trim());
+  $("#geminiBanner")?.classList.toggle("hidden", has);
+}
+
+function maybeInstallTip() {
   const ua = navigator.userAgent || "";
+  const android = /android/i.test(ua);
   const ios = /iphone|ipad|ipod/i.test(ua);
   const stand = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone;
-  if (ios && !stand && !sessionStorage.getItem("gloss-ios-tip")) {
-    $("#iosTip").classList.remove("hidden");
+  if (stand || sessionStorage.getItem("cw-install-tip")) return;
+  if (android || ios) {
+    if (ios) {
+      $("#installTipText").innerHTML = "On iPhone: tap Share, then <b>Add to Home Screen</b>.";
+    }
+    $("#installTip").classList.remove("hidden");
   }
 }
 
@@ -492,6 +503,7 @@ async function boot() {
   const saved = await db.getKV("settings", null);
   if (saved) state.settings = { ...DEFAULTS, ...saved };
   applyTheme();
+  syncGeminiBanner();
   await ensureSamples();
   await refreshLibrary();
 
@@ -599,11 +611,21 @@ async function boot() {
   $("#scrim").addEventListener("click", () => closePanel());
   setupSheetDrag();
 
-  $("#iosDismiss").addEventListener("click", () => {
-    $("#iosTip").classList.add("hidden");
-    sessionStorage.setItem("gloss-ios-tip", "1");
+  $("#installDismiss")?.addEventListener("click", () => {
+    $("#installTip").classList.add("hidden");
+    sessionStorage.setItem("cw-install-tip", "1");
   });
-  maybeIosTip();
+  maybeInstallTip();
+
+  $("#bannerSave")?.addEventListener("click", async () => {
+    const key = $("#bannerKey").value.trim();
+    if (!key) return toast("Paste the Gemini key first.");
+    state.settings.geminiKey = key;
+    await db.setKV("settings", state.settings);
+    $("#bannerKey").value = "";
+    syncGeminiBanner();
+    toast("Gemini key saved on this device");
+  });
 
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
@@ -620,5 +642,5 @@ async function boot() {
 
 boot().catch((err) => {
   console.error(err);
-  toast("Something went wrong starting Gloss.");
+  toast("Something went wrong starting Context Word.");
 });
