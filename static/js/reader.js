@@ -303,6 +303,7 @@ export class Reader {
     canvas.height = Math.floor(viewport.height * dpr);
     canvas.style.width = `${Math.floor(viewport.width)}px`;
     canvas.style.height = `${Math.floor(viewport.height)}px`;
+    canvas.style.pointerEvents = "none";
     const ctx = canvas.getContext("2d");
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
@@ -319,18 +320,17 @@ export class Reader {
     slot.style.minHeight = `${Math.floor(viewport.height)}px`;
 
     await page.render({ canvasContext: ctx, viewport }).promise;
-    try {
-      const textContent = await page.getTextContent();
-      const task = pdfjsLib.renderTextLayer({
-        textContent,
-        container: textLayer,
-        viewport,
-        textDivs: []
-      });
-      if (task && task.promise) await task.promise;
-    } catch (err) {
-      console.warn("PDF text layer failed", err);
+    const textContent = await page.getTextContent().catch(() => ({ items: [] }));
+    const items = (textContent.items || []).filter((it) => it.str && String(it.str).trim());
+    if (!items.length) {
+      const note = document.createElement("div");
+      note.className = "pdf-scan-note";
+      note.textContent =
+        "This page is a picture — there is no text to highlight. Open a sample on the shelf, or a PDF saved as text (not a scan).";
+      inner.appendChild(note);
+      return;
     }
+    await fillPdfTextLayer(pdfjsLib, textContent, textLayer, viewport);
     this.cleanup.push(bindGlossEvents(textLayer, { onGloss: this.onGloss }));
   }
 

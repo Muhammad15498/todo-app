@@ -304,9 +304,34 @@
     if (info.word === onHighlight._last && now - (onHighlight._at || 0) < 800) return;
     onHighlight._last = info.word;
     onHighlight._at = now;
+    say("Highlighted: " + info.word);
+    openPanel();
+    var body = el("panelBody");
+    if (body) {
+      body.innerHTML =
+        '<p class="plain"><span class="busy"></span> &nbsp; Understanding “' +
+        escapeHtml(info.word) +
+        "”…</p>";
+    }
     if (window.cwGloss) window.cwGloss(info);
     else localExplain(info);
   }
+
+  function bindHighlightWatch() {
+    if (bindHighlightWatch._on) return;
+    bindHighlightWatch._on = true;
+    var t = null;
+    function kick() {
+      clearTimeout(t);
+      t = setTimeout(onHighlight, 50);
+    }
+    document.addEventListener("selectionchange", kick);
+    document.addEventListener("mouseup", kick, true);
+    document.addEventListener("pointerup", kick, true);
+    document.addEventListener("keyup", kick, true);
+    document.addEventListener("touchend", kick, true);
+  }
+  bindHighlightWatch();
 
   var CW = {
     say: say,
@@ -574,6 +599,7 @@
   }
   ready(function () {
     wireFile();
-    say("Context Word · build 7 · buttons are live");
+    bindHighlightWatch();
+    say("Context Word · build 9 · highlight a word");
   });
 })();
