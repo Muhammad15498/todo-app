@@ -105,6 +105,11 @@ function escapeHtml(s) {
 }
 
 async function ensureSamples() {
+  try {
+    await db.deleteDoc("sample-how");
+  } catch {
+    /* ignore */
+  }
   const existing = await db.allDocs();
   const have = new Map(existing.map((d) => [d.id, d]));
   for (const s of SAMPLES) {
@@ -204,8 +209,8 @@ async function ingestPaste(title, text) {
 function emptyPanelHtml() {
   return `
     <div class="panel-empty">
-      <h2>Highlight a word.</h2>
-      <p>Select 1–4 words, then tap <b>Explain</b>. You’ll get Meaning, Context, and العربي ببساطة in this panel — same as the Chrome extension.</p>
+      <h2>Highlight 1–4 words.</h2>
+      <p>The meaning appears here as soon as you let go — Meaning, Context, and العربي ببساطة. No extra button.</p>
     </div>`;
 }
 
@@ -546,6 +551,8 @@ async function boot() {
   window.cwIngestPaste = ingestPaste;
   window.cwRenderVocab = renderVocab;
   window.cwSaveSettings = saveSettings;
+  window.cwOpenDoc = openDoc;
+  window.cwGloss = (info) => gloss(info);
   if (!window.CW) {
     $("#openFile")?.addEventListener("click", () => $("#fileInput").click());
   }

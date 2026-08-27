@@ -460,6 +460,24 @@ a { color: var(--accent); }
   margin: 0 auto;
   max-width: 100%;
 }
+.pdf-page-inner canvas {
+  display: block;
+  pointer-events: none;
+}
+.pdf-scan-note {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: 8%;
+  z-index: 3;
+  background: rgba(31, 26, 20, 0.92);
+  color: #faf6ee;
+  padding: 0.8rem 1rem;
+  border-radius: 12px;
+  font-size: 0.92rem;
+  line-height: 1.4;
+  pointer-events: none;
+}
 
 .cw-explain {
   position: fixed;

@@ -1,31 +1,25 @@
 export const SAMPLES = [
   {
-    id: "sample-how",
-    title: "How to read with Gloss",
+    id: "sample-phrases",
+    title: "Phrases that hide",
     type: "sample",
-    blurb: "A short guide. Tap a word to see the panel work.",
-    body: `Tap any word on this page. Gloss opens in the side panel and tells you what that word means here — in this sentence — not in a vacuum.
+    blurb: "Highlight give up, take into account, in spite of — they are not the sum of their parts.",
+    body: `The committee took the delay into account and, in the end, decided to give up the old plan. Nobody wanted to make a mountain out of a molehill, but the deadline was real, and the client would not wait.
 
-That distinction matters. English is full of words that change shape depending on the company they keep. A bright student is not emitting light. A cool reception can feel freezing without a drop in temperature. When you tap or hover, Gloss looks at the surrounding lines and picks the sense that actually fits.
+Maya had carried out the first half of the work in spite of a fever. She did not look up from the page until the numbers began to make sense. “We can still figure this out,” she said. On the other hand, hoping is not a schedule.
 
-On a phone there is no hover, so a tap does the same job. Drag across two or three words if you have met a phrase: give up, in spite of, carry out. Those are not the sum of their parts.
+A junior engineer asked her to break down the risk in plain language. She did not brush it off. “If we put this off again, we will run out of time, not money.” He took it in, then wrote it down.
 
-Your files never leave this device. Open a PDF, an EPUB, a Word document, or a plain text file. They live in your library, on this phone or computer. If you like, paste an article you are already in the middle of.
+Later they sat with coffee and went over the same sentences as if they were a puzzle. Take into account. Give up. Carry out. In spite of. Figure out. Put off. Run out of. Each one is a small machine. You cannot understand the machine by looking at one screw.
 
-If a word has several meanings, the one that matches this context is shown first. The others wait underneath, in case you are curious. Save any word to your notebook and it will remember the sentence you found it in — the only way vocabulary actually sticks.
-
-A last piece of advice: do not stop to gloss every word. Read for the music of the sentence. When a word truly blocks the meaning, tap it, understand it, and go on.
-
-You can also select a whole phrase. Try highlighting “in a vacuum” or “the company they keep” and watch how Gloss treats them as a unit, not as stray parts.
-
-Gloss is free. No account, no key, no subscription. A public dictionary is ranked against the sentence you are in. The book never leaves this device.`
+Try it: highlight any of those phrases, or a single word inside them. The panel on the right should explain what the writer means here, not in a dictionary vacuum.`
   },
   {
     id: "sample-bank",
     title: "The river and the ledger",
     type: "sample",
-    blurb: "Same words, different meanings — a test for context.",
-    body: `He reached the bank at dusk. The river had dropped after the long heat, leaving a shelf of pale stones. He sat on the bank and took off his shoes. In his pocket was a letter from the bank, the other kind — the one with columns and a balance. They would not extend the loan. He had been running the shop for eleven years and running out of time for three. He would have to close, or sell, or both.
+    blurb: "Bank, current, light, run — same spelling, different job. Built to test context.",
+    body: `He reached the bank at dusk. The river had dropped after the long heat, leaving a shelf of pale stones. He sat on the bank and took off his shoes. In his pocket was a letter from the bank, the other kind — the one with columns and a balance. They would not extend the loan. He had been running the shop for eleven years and running out of time for three.
 
 A pair of ducks set down on the water. He set his jaw. Nothing about the evening was fair, but the light on the river was, in its own indifferent way, beautiful. He folded the letter, put it away, and walked back along the path, lighter by a decision and heavier by everything else.
 
@@ -37,7 +31,7 @@ The current of the river sounded like paper being torn, slowly. He thought of th
     id: "sample-machines",
     title: "Quiet machines",
     type: "sample",
-    blurb: "A little science. Denser words, same gesture.",
+    blurb: "Denser words: opaque, mitigate, sanguine, ubiquitous. Highlight any of them.",
     body: `The engine did not fail so much as it declined to continue. A thin metallic smell hung in the bay. Maya ran a diagnostic and watched the figures settle. The fault was opaque at first: a sensor that had drifted, then a cascade. She isolated the circuit, mitigated the heat, and waited. In the old days a mechanic would have listened with a screwdriver against the block. Now the machine reported on itself, in a language that was precise and somehow less intimate.
 
 She was sanguine about the repair. Not because it was trivial, but because she had seen this pattern before. Ubiquitous sensors make every engine a little more honest, and a little more mysterious. You can have all the data in the world and still need a hunch.

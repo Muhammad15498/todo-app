@@ -115,16 +115,24 @@ export function bindGlossEvents(root, { onGloss, getDoc }) {
   const doc = root.ownerDocument || document;
   const win = doc.defaultView || window;
   const coarse = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+  let last = "";
+  let lastAt = 0;
+
+  const fire = (info) => {
+    if (!info || !info.word) return;
+    const now = Date.now();
+    if (info.word === last && now - lastAt < 700) return;
+    last = info.word;
+    lastAt = now;
+    removeExplainButton();
+    onGloss(info);
+  };
 
   const onUp = (e) => {
     if (e.target.closest?.("button, a, input, textarea, .cw-explain")) return;
     const sel = getDoc ? getDoc().getSelection() : win.getSelection();
     const selected = selectionInfo(sel);
-    if (selected) {
-      showExplainButton(selected, onGloss);
-      return;
-    }
-    removeExplainButton();
+    if (selected) fire(selected);
   };
 
   const onClick = (e) => {
@@ -132,8 +140,7 @@ export function bindGlossEvents(root, { onGloss, getDoc }) {
     const sel = getDoc ? getDoc().getSelection() : win.getSelection();
     if (selectionInfo(sel)) return;
     if (!coarse) return;
-    const info = wordAtPoint(e.clientX, e.clientY, doc);
-    if (info) onGloss(info);
+    fire(wordAtPoint(e.clientX, e.clientY, doc));
   };
 
   root.addEventListener("mouseup", onUp);
@@ -146,6 +153,49 @@ export function bindGlossEvents(root, { onGloss, getDoc }) {
     root.removeEventListener("touchend", onUp);
     root.removeEventListener("click", onClick);
   };
+}
+
+function paintPdfText(textContent, layer, viewport, pdfjsLib) {
+  const Util = pdfjsLib.Util;
+  layer.replaceChildren();
+  for (const item of textContent.items || []) {
+    if (!item.str) continue;
+    const tx = Util
+      ? Util.transform(viewport.transform, item.transform)
+      : item.transform;
+    const fontHeight = Math.hypot(tx[2], tx[3]) || 12;
+    const span = document.createElement("span");
+    span.textContent = item.str;
+    span.style.left = `${tx[4]}px`;
+    span.style.top = `${tx[5] - fontHeight}px`;
+    span.style.fontSize = `${fontHeight}px`;
+    span.style.fontFamily = "sans-serif";
+    const angle = Math.atan2(tx[1], tx[0]);
+    if (angle) span.style.transform = `rotate(${angle}rad)`;
+    layer.appendChild(span);
+  }
+}
+
+async function fillPdfTextLayer(pdfjsLib, textContent, layer, viewport) {
+  layer.replaceChildren();
+  try {
+    if (typeof pdfjsLib.renderTextLayer === "function") {
+      const task = pdfjsLib.renderTextLayer({
+        textContentSource: textContent,
+        textContent,
+        container: layer,
+        viewport,
+        textDivs: []
+      });
+      if (task && task.promise) await task.promise;
+      else if (task && typeof task.then === "function") await task;
+    }
+  } catch (err) {
+    console.warn("pdf.js text layer", err);
+  }
+  if (!layer.childElementCount) {
+    paintPdfText(textContent, layer, viewport, pdfjsLib);
+  }
 }
 
 function escapeHtml(s) {

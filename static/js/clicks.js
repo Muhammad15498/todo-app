@@ -81,7 +81,26 @@
       "</article>";
     if (el("panelBody")) {
       el("panelBody").innerHTML =
-        '<div class="panel-empty"><h2>Highlight a word.</h2><p>Select 1–4 words, then tap <b>Explain</b>.</p></div>';
+        '<div class="panel-empty"><h2>Highlight 1–4 words.</h2><p>The meaning appears here as soon as you let go.</p></div>';
+    }
+  }
+
+  function paintPdfText(textContent, layer, viewport, pdfjsLib) {
+    var Util = pdfjsLib.Util;
+    layer.innerHTML = "";
+    var items = textContent.items || [];
+    for (var i = 0; i < items.length; i += 1) {
+      var item = items[i];
+      if (!item.str) continue;
+      var tx = Util ? Util.transform(viewport.transform, item.transform) : item.transform;
+      var fontHeight = Math.hypot(tx[2], tx[3]) || 12;
+      var span = document.createElement("span");
+      span.textContent = item.str;
+      span.style.left = tx[4] + "px";
+      span.style.top = tx[5] - fontHeight + "px";
+      span.style.fontSize = fontHeight + "px";
+      span.style.fontFamily = "sans-serif";
+      layer.appendChild(span);
     }
   }
 
@@ -102,22 +121,191 @@
     stage.dataset.kind = "pdf";
     var width = Math.max(420, (stage.clientWidth || 720) - 24);
     var max = Math.min(pdf.numPages, 20);
+    var anyText = false;
     for (var i = 1; i <= max; i += 1) {
       var page = await pdf.getPage(i);
       var base = page.getViewport({ scale: 1 });
       var viewport = page.getViewport({ scale: width / base.width });
+      var wrap = document.createElement("div");
+      wrap.className = "pdf-page-inner";
+      wrap.style.width = Math.floor(viewport.width) + "px";
+      wrap.style.height = Math.floor(viewport.height) + "px";
+      wrap.style.margin = "0.85rem auto";
       var canvas = document.createElement("canvas");
       canvas.width = Math.floor(viewport.width);
       canvas.height = Math.floor(viewport.height);
       canvas.style.display = "block";
       canvas.style.width = "100%";
-      canvas.style.maxWidth = Math.floor(viewport.width) + "px";
-      canvas.style.margin = "0.85rem auto";
-      canvas.style.boxShadow = "0 18px 50px rgba(31, 26, 20, 0.12)";
-      stage.appendChild(canvas);
+      canvas.style.pointerEvents = "none";
+      var layer = document.createElement("div");
+      layer.className = "textLayer";
+      layer.style.width = Math.floor(viewport.width) + "px";
+      layer.style.height = Math.floor(viewport.height) + "px";
+      wrap.appendChild(canvas);
+      wrap.appendChild(layer);
+      stage.appendChild(wrap);
       await page.render({ canvasContext: canvas.getContext("2d"), viewport: viewport }).promise;
+      var textContent = await page.getTextContent().catch(function () {
+        return { items: [] };
+      });
+      var items = (textContent.items || []).filter(function (it) {
+        return it.str && String(it.str).trim();
+      });
+      if (items.length) {
+        anyText = true;
+        paintPdfText(textContent, layer, viewport, window.pdfjsLib);
+      }
     }
-    say("Opened PDF · " + pdf.numPages + " page" + (pdf.numPages === 1 ? "" : "s"));
+    if (!anyText) {
+      say("This PDF is a picture. There is no text to highlight. Open a sample instead.");
+    } else {
+      say("Opened PDF · highlight 1–4 words");
+    }
+  }
+
+  function parseCoach(text) {
+    var result = {
+      Meaning: "",
+      Context: "",
+      Arabic: "",
+      "When To Use It": "",
+      "Don't Confuse": "",
+      Examples: "",
+      "The Idea": ""
+    };
+    var headings = Object.keys(result).map(function (k) {
+      return k + ":";
+    });
+    var current = null;
+    String(text || "")
+      .split("\n")
+      .forEach(function (raw) {
+        var line = raw.trim();
+        if (!line) return;
+        var heading = headings.find(function (h) {
+          return line.toLowerCase().indexOf(h.toLowerCase()) === 0;
+        });
+        if (heading) {
+          current = heading.replace(":", "");
+          var content = line.substring(heading.length).trim();
+          if (content) result[current] += content + " ";
+        } else if (current) {
+          result[current] += line + " ";
+        }
+      });
+    return result;
+  }
+
+  function openPanel() {
+    var p = el("panel");
+    if (p) p.classList.add("open");
+    var s = el("scrim");
+    if (s) s.classList.add("show");
+  }
+
+  async function localExplain(info) {
+    var body = el("panelBody");
+    if (!body) return;
+    openPanel();
+    body.innerHTML =
+      '<p class="plain"><span class="busy"></span> &nbsp; Understanding “' +
+      escapeHtml(info.word) +
+      '”…</p>';
+    var k = key();
+    if (!k) {
+      body.innerHTML =
+        '<div class="panel-empty"><h2>' +
+        escapeHtml(info.word) +
+        '</h2><p>Paste your Gemini key on the shelf, then highlight again.</p></div>';
+      return;
+    }
+    try {
+      var prompt =
+        'You are an English vocabulary coach. The learner highlighted "' +
+        info.word +
+        '". Immediate sentence: "' +
+        (info.sentence || "") +
+        '". Nearby: "' +
+        (info.passage || "").slice(0, 1800) +
+        '". Use extremely clear simple English. RETURN ONLY these headings:\nMeaning:\nContext:\nArabic:\nWhen To Use It:\nDon\'t Confuse:\nExamples:\nThe Idea:\n';
+      var res = await fetch(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=" +
+          encodeURIComponent(k),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+        }
+      );
+      var data = await res.json().catch(function () {
+        return {};
+      });
+      if (!res.ok) {
+        body.innerHTML =
+          '<p class="hint">Gemini failed: ' +
+          escapeHtml((data.error && data.error.message) || String(res.status)) +
+          "</p>";
+        return;
+      }
+      var raw =
+        data.candidates &&
+        data.candidates[0] &&
+        data.candidates[0].content &&
+        data.candidates[0].content.parts &&
+        data.candidates[0].content.parts[0] &&
+        data.candidates[0].content.parts[0].text;
+      var coach = parseCoach(raw);
+      body.innerHTML =
+        '<h2 class="headword">' +
+        escapeHtml(info.word) +
+        "</h2>" +
+        (coach.Meaning
+          ? '<div class="block"><h3>Meaning</h3><p class="plain">' + escapeHtml(coach.Meaning) + "</p></div>"
+          : "") +
+        (coach.Context
+          ? '<div class="block"><h3>Context</h3><p class="plain">' + escapeHtml(coach.Context) + "</p></div>"
+          : "") +
+        (coach.Arabic
+          ? '<div class="block"><h3>العربي ببساطة</h3><p class="translation" dir="rtl">' +
+            escapeHtml(coach.Arabic) +
+            "</p></div>"
+          : "");
+    } catch (err) {
+      body.innerHTML =
+        '<p class="hint">Could not reach Gemini in this window. Open the preview in a new tab.</p>';
+    }
+  }
+
+  function selectionInStage() {
+    var stage = el("stage");
+    var reader = el("view-reader");
+    if (!stage || !reader || reader.classList.contains("hidden")) return null;
+    var sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !sel.anchorNode) return null;
+    if (!stage.contains(sel.anchorNode)) return null;
+    var raw = sel.toString().replace(/\s+/g, " ").trim();
+    if (!raw || raw.length > 80) return null;
+    var words = raw.split(" ").filter(Boolean);
+    if (!words.length || words.length > 4) return null;
+    var passage = raw;
+    try {
+      var node = sel.anchorNode;
+      var host = node.nodeType === 1 ? node : node.parentElement;
+      var block = (host && host.closest && host.closest("p, li, .textLayer, article, div")) || host;
+      passage = ((block && block.innerText) || raw).replace(/\s+/g, " ").trim().slice(0, 1800);
+    } catch (e) {}
+    return { word: raw, sentence: passage, passage: passage };
+  }
+
+  function onHighlight() {
+    var info = selectionInStage();
+    if (!info) return;
+    var now = Date.now();
+    if (info.word === onHighlight._last && now - (onHighlight._at || 0) < 800) return;
+    onHighlight._last = info.word;
+    onHighlight._at = now;
+    if (window.cwGloss) window.cwGloss(info);
+    else localExplain(info);
   }
 
   var CW = {
@@ -225,16 +413,46 @@
       say("Notebook");
       if (window.cwRenderVocab) window.cwRenderVocab();
     },
-    sample: function () {
-      showText(
-        "A short page to try",
-        "The committee took the delay into account and decided to give up the old plan. Nobody wanted to make a mountain out of a molehill, but the deadline was real. Highlight any of those words, then tap Explain."
-      );
-      say("Opened a sample page. Highlight a word.");
+    sample: function (which) {
+      var pack =
+        which === "bank"
+          ? {
+              id: "sample-bank",
+              title: "The river and the ledger",
+              text: "He reached the bank at dusk. The river had dropped after the long heat, leaving a shelf of pale stones. He sat on the bank and took off his shoes. In his pocket was a letter from the bank, the other kind — the one with columns and a balance.\n\nThe current of the river sounded like paper being torn. He thought of the current in his account. Bank. Current. Light. Run. Highlight any of those words."
+            }
+          : which === "science"
+            ? {
+                id: "sample-machines",
+                title: "Quiet machines",
+                text: "The engine did not fail so much as it declined to continue. The fault was opaque at first. She isolated the circuit, mitigated the heat, and waited. She was sanguine about the repair. Ubiquitous sensors make every engine a little more honest.\n\nHighlight opaque, mitigate, sanguine, or ubiquitous."
+              }
+            : {
+                id: "sample-phrases",
+                title: "Phrases that hide",
+                text: "The committee took the delay into account and, in the end, decided to give up the old plan. Nobody wanted to make a mountain out of a molehill, but the deadline was real.\n\nMaya had carried out the first half of the work in spite of a fever. She did not look up from the page until the numbers began to make sense. We can still figure this out, she said.\n\nHighlight give up, take into account, in spite of, or any single word."
+              };
+      if (window.cwOpenDoc) {
+        Promise.resolve(window.cwOpenDoc(pack.id)).then(function () {
+          var reader = el("view-reader");
+          if (reader && reader.classList.contains("hidden")) showText(pack.title, pack.text);
+        });
+        say("Opened a sample. Highlight 1–4 words.");
+        return;
+      }
+      showText(pack.title, pack.text);
+      say("Opened a sample. Highlight 1–4 words.");
     },
     onFiles: async function (files) {
       var list = files && files.length ? files : null;
       if (!list || !list.length) return;
+      var n = 0;
+      while (!window.cwIngestFiles && n < 40) {
+        await new Promise(function (r) {
+          setTimeout(r, 50);
+        });
+        n += 1;
+      }
       if (window.cwIngestFiles) {
         window.cwIngestFiles(list);
         return;
@@ -304,7 +522,13 @@
         CW.vocab();
         return true;
       case "cardDemo":
-        CW.sample();
+        CW.sample("phrases");
+        return true;
+      case "cardBank":
+        CW.sample("bank");
+        return true;
+      case "cardScience":
+        CW.sample("science");
         return true;
       case "installDismiss":
         if (el("installTip")) el("installTip").classList.add("hidden");
@@ -316,13 +540,12 @@
 
   function fromEvent(e) {
     var node = e.target;
-    if (!node) return;
-    if (node.closest) {
-      var hit = node.closest("button, .card, #drop, [data-cw]");
-      if (hit && hit.id && handle(hit.id)) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
+    if (!node || !node.closest) return;
+    if (node.closest("#stage, .textLayer, .prose, #panelBody")) return;
+    var hit = node.closest("button, .card, #drop, [data-cw]");
+    if (hit && hit.id && handle(hit.id)) {
+      e.preventDefault();
+      e.stopPropagation();
     }
   }
 
