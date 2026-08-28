@@ -89,7 +89,7 @@ Picture It:
 One small scene they can close their eyes and see.
 
 For Instance:
-Two everyday cases. Start with such as.
+Two complete everyday English sentences that use the highlighted text with THIS same meaning. One sentence per line. Do not start with "such as". Do not explain — write the sentences only, as a native speaker would actually say them.
 
 Sounds Like:
 How to say it, like: oh-PAYK

@@ -323,7 +323,7 @@
       "Picture It:\n" +
       "One small scene they can close their eyes and see.\n\n" +
       "For Instance:\n" +
-      "Two everyday cases. Start with such as.\n\n" +
+      "Two complete everyday English sentences that use the highlighted text with THIS same meaning. One sentence per line. Do not start with such as.\n\n" +
       "Sounds Like:\n" +
       "How to say it, like: oh-PAYK\n\n" +
       "Don't Confuse:\n" +
@@ -335,7 +335,7 @@
       "Here it means: took into account = they considered it; it affected the decision.\n" +
       "Arabic: الجملة دي معناها: اللجنة حسبت حساب التأخير وهي بتقرر. والكلمة هنا: take into account يعني يعتبر الحاجة دي مش يتجاهلها.\n" +
       "Picture It: People at a table. One person points at a clock. The others nod and change the plan.\n" +
-      "For Instance: such as counting extra traffic when you choose when to leave; such as a doctor considering your other medicines before giving a new one.\n" +
+      "For Instance:\nWe took the rain into account and left twenty minutes early.\nThe doctor took her other medicines into account before choosing a new one.\n" +
       "Sounds Like: uh-KOWNT\n" +
       "Don't Confuse: Not a bank account. Here it is about paying attention to something.\n\n" +
       "Do not use markdown, bullets, or emojis. Use exactly those headings."
@@ -728,6 +728,15 @@
         return true;
       case "readMode":
         if (window.cwTogglePdfMode) window.cwTogglePdfMode();
+        return true;
+      case "panelClose":
+        if (window.cwClosePanel) window.cwClosePanel();
+        return true;
+      case "pagerPrev":
+        if (window.cwPage) window.cwPage(-1);
+        return true;
+      case "pagerNext":
+        if (window.cwPage) window.cwPage(1);
         return true;
       case "noteClose":
         showModal("noteModal", false);

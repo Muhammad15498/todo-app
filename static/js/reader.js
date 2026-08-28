@@ -222,7 +222,7 @@ function textToProse(text) {
     .join("");
 }
 
-async function extractPdfPlainText(pdf) {
+async function extractPdfPages(pdf) {
   const max = Math.min(pdf.numPages || 0, 250);
   const pages = [];
   for (let i = 1; i <= max; i += 1) {
@@ -235,23 +235,39 @@ async function extractPdfPlainText(pdf) {
       else if (buf && !/\s$/.test(buf)) buf += " ";
     }
     const cleaned = buf.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
-    if (cleaned) pages.push(cleaned);
+    pages.push(cleaned);
   }
-  return pages.join("\n\n");
+  return pages;
+}
+
+function setPager(index, total) {
+  const wrap = document.getElementById("pager");
+  const label = document.getElementById("pagerLabel");
+  const prev = document.getElementById("pagerPrev");
+  const next = document.getElementById("pagerNext");
+  if (!wrap) return;
+  if (!total || total < 2) {
+    wrap.classList.add("hidden");
+    return;
+  }
+  wrap.classList.remove("hidden");
+  if (label) label.textContent = `${index + 1} / ${total}`;
+  if (prev) prev.disabled = index <= 0;
+  if (next) next.disabled = index >= total - 1;
 }
 
 function setReadModeBtn(mode, hasToggle) {
   const btn = document.getElementById("readMode");
   const zoom = document.getElementById("zoomGroup");
-  if (!btn) return;
-  if (!hasToggle) {
-    btn.classList.add("hidden");
-    if (zoom) zoom.classList.toggle("hidden", mode === "text");
-    return;
+  if (btn) {
+    if (!hasToggle) btn.classList.add("hidden");
+    else {
+      btn.classList.remove("hidden");
+      btn.textContent = mode === "text" ? "Printed pages" : "Book pages";
+    }
   }
-  btn.classList.remove("hidden");
-  btn.textContent = mode === "text" ? "Page view" : "Book view";
   if (zoom) zoom.classList.toggle("hidden", mode === "text");
+  if (mode !== "text") setPager(0, 0);
 }
 
 export class Reader {
@@ -268,6 +284,8 @@ export class Reader {
     this._drawn = new Set();
     this._title = "";
     this._plain = "";
+    this._pages = [];
+    this._pageIndex = 0;
     this._pdfMode = "";
   }
 
@@ -294,9 +312,12 @@ export class Reader {
     this._slots = [];
     this._drawn = new Set();
     this._plain = "";
+    this._pages = [];
+    this._pageIndex = 0;
     this._pdfMode = "";
     this.stage.innerHTML = "";
     setReadModeBtn("text", false);
+    setPager(0, 0);
   }
 
   clearStage() {
@@ -334,27 +355,71 @@ export class Reader {
   }
 
   async togglePdfMode() {
-    if (!this.pdf || !this._plain) return;
+    if (!this.pdf || !this._pages.length) return;
     if (this._pdfMode === "text") {
       this.clearStage();
       this._pdfMode = "pages";
       this.stage.dataset.kind = "pdf";
       setReadModeBtn("pages", true);
+      setPager(0, 0);
       return this._renderPdfPages();
     }
     this.clearStage();
     this._pdfMode = "text";
     this.stage.dataset.kind = "txt";
     setReadModeBtn("text", true);
-    return this.loadText(this._plain, this._title);
+    return this.showBookPage(this._pageIndex || 0);
+  }
+
+  turnPage(delta) {
+    if (this._pdfMode === "pages" && this.pdf) {
+      const slots = this._slots || [];
+      if (!slots.length) return;
+      const stage = this.stage;
+      let current = 0;
+      const top = stage.getBoundingClientRect().top + 24;
+      slots.forEach((slot, i) => {
+        if (slot.getBoundingClientRect().top <= top) current = i;
+      });
+      const next = Math.min(slots.length - 1, Math.max(0, current + delta));
+      slots[next]?.scrollIntoView({ block: "start" });
+      return;
+    }
+    if (!this._pages || this._pages.length < 2) return;
+    const i = Math.min(this._pages.length - 1, Math.max(0, (this._pageIndex || 0) + delta));
+    if (i === this._pageIndex) return;
+    this.showBookPage(i);
+  }
+
+  showBookPage(index) {
+    const pages = this._pages || [];
+    if (!pages.length) return;
+    const i = Math.min(pages.length - 1, Math.max(0, index | 0));
+    this._pageIndex = i;
+    this.clearStage();
+    this.stage.dataset.kind = "txt";
+    const raw = pages[i] || "";
+    const article = document.createElement("article");
+    article.className = "prose";
+    const kicker = this._title
+      ? `<header class="prose-kicker">${escapeHtml(this._title)}</header>`
+      : "";
+    const folio = pages.length > 1 ? `<p class="hint">Page ${i + 1} of ${pages.length}</p>` : "";
+    const body = raw.trim()
+      ? textToProse(raw)
+      : `<p class="plain">This page is a picture in the file. There is no text to highlight. Tap Printed pages to see it as a photo.</p>`;
+    article.innerHTML = kicker + folio + body;
+    this.stage.appendChild(article);
+    this.stage.scrollTop = 0;
+    this.cleanup.push(bindGlossEvents(article, { onGloss: this.onGloss }));
+    setPager(i, pages.length);
   }
 
   loadText(text, title) {
-    const article = document.createElement("article");
-    article.className = "prose";
-    article.innerHTML = `${title ? `<header class="prose-kicker">${escapeHtml(title)}</header>` : ""}${textToProse(text)}`;
-    this.stage.appendChild(article);
-    this.cleanup.push(bindGlossEvents(article, { onGloss: this.onGloss }));
+    this._pages = [text || ""];
+    this._pageIndex = 0;
+    this._title = title || this._title || "";
+    this.showBookPage(0);
   }
 
   async loadDocx(blob) {
@@ -425,16 +490,19 @@ export class Reader {
     const data = await blob.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data }).promise;
     this.pdf = pdf;
-    const plain = await extractPdfPlainText(pdf);
-    this._plain = plain;
-    if ((plain || "").replace(/\s/g, "").length > 80) {
+    const pages = await extractPdfPages(pdf);
+    this._pages = pages;
+    this._plain = pages.filter(Boolean).join("\n\n");
+    this._pageIndex = 0;
+    if ((this._plain || "").replace(/\s/g, "").length > 80) {
       this._pdfMode = "text";
       this.stage.innerHTML = "";
       this.stage.dataset.kind = "txt";
       setReadModeBtn("text", true);
-      return this.loadText(plain, this._title);
+      return this.showBookPage(0);
     }
     setReadModeBtn("pages", false);
+    setPager(0, 0);
     this.stage.innerHTML = "";
     this.stage.dataset.kind = "pdf";
     return this._renderPdfPages();

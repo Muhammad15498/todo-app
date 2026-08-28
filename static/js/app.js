@@ -166,7 +166,7 @@ async function openDoc(id) {
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
   $("#readerTitle").textContent = doc.title;
   $("#panelBody").innerHTML = emptyPanelHtml();
-  closePanel(true);
+  $(".reader")?.classList.remove("panel-collapsed");
   let blob = null;
   if (!doc.builtin && doc.type !== "sample" && !doc.text) {
     blob = await db.getFile(doc.id);
@@ -247,6 +247,23 @@ function escapeRegExp(s) {
   return String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function exampleLines(text) {
+  return String(text || "")
+    .replace(/^such as\s*/i, "")
+    .split(/\n+|(?<=[.!?])\s+(?=[A-Z])/)
+    .map((line) => line.replace(/^[-•]\s*/, "").replace(/^such as\s*/i, "").trim())
+    .filter((line) => line.length > 8)
+    .slice(0, 3);
+}
+
+function exampleBlocks(text) {
+  const lines = exampleLines(text);
+  if (!lines.length) return "";
+  return `<div class="block"><h3>Other real examples</h3>${lines
+    .map((line) => `<p class="sentence">${escapeHtml(line)}</p>`)
+    .join("")}</div>`;
+}
+
 function markSentence(sentence, word) {
   const safe = escapeHtml(sentence);
   if (!word) return safe;
@@ -256,12 +273,13 @@ function markSentence(sentence, word) {
 
 function openPanel() {
   $("#panel").classList.add("open");
+  $(".reader")?.classList.remove("panel-collapsed");
   $("#scrim").classList.add("show");
 }
 
-function closePanel(keepDesktop = false) {
-  if (keepDesktop && window.matchMedia("(min-width: 961px)").matches) return;
+function closePanel() {
   $("#panel").classList.remove("open");
+  $(".reader")?.classList.add("panel-collapsed");
   $("#scrim").classList.remove("show");
 }
 
@@ -304,8 +322,8 @@ function renderPanel(data, loading) {
           ? `<div class="block"><h3>العربي ببساطة</h3><p class="translation" dir="rtl">${escapeHtml(coach.Arabic.trim())}</p></div>`
           : ""
       }
-      ${coach["Picture It"]?.trim() ? `<div class="block"><h3>Picture it</h3><p class="plain">${escapeHtml(coach["Picture It"].trim())}</p></div>` : ""}
-      ${coach["For Instance"]?.trim() ? `<div class="block"><h3>For instance</h3><p class="plain">${escapeHtml(coach["For Instance"].trim())}</p></div>` : ""}
+      ${coach["Picture It"]?.trim() ? `<div class="block"><h3>See it in your head</h3><p class="plain">${escapeHtml(coach["Picture It"].trim())}</p></div>` : ""}
+      ${exampleBlocks(coach["For Instance"])}
       ${coach["Don't Confuse"]?.trim() ? `<div class="block"><h3>Don't confuse</h3><p class="plain">${escapeHtml(coach["Don't Confuse"].trim())}</p></div>` : ""}
     `
     : `
@@ -453,7 +471,7 @@ async function renderVocab() {
       <article class="vocab-item" data-open-word="${w.id}" tabindex="0">
         <div>
           <h3>${escapeHtml(w.word)}</h3>
-          <p>${escapeHtml(w.meaning)}</p>
+          ${w.meaning ? `<p>${escapeHtml(w.meaning)}</p>` : ""}
           ${w.context ? `<p class="sentence" style="margin-top:.5rem">${escapeHtml(w.context)}</p>` : ""}
           <p style="margin-top:.4rem;font-size:.8rem">${escapeHtml(w.docTitle || "")}</p>
         </div>
@@ -463,19 +481,30 @@ async function renderVocab() {
     .join("");
 }
 
+function fillNoteField(id, text, blockId) {
+  const el = $(id);
+  if (!el) return;
+  el.textContent = text || "";
+  const block = blockId ? $(blockId) : el;
+  if (block) block.classList.toggle("hidden", !String(text || "").trim());
+}
+
 function openSavedWord(w) {
   if (!w) return;
-  const word = $("#noteWord");
-  const meaning = $("#noteMeaning");
-  const context = $("#noteContext");
-  const source = $("#noteSource");
-  if (word) word.textContent = w.word || "";
-  if (meaning) meaning.textContent = w.meaning || "";
-  if (context) {
-    context.textContent = w.context || "";
-    context.classList.toggle("hidden", !w.context);
+  fillNoteField("#noteWord", w.word);
+  fillNoteField("#notePhonetic", w.phonetic);
+  fillNoteField("#noteMeaning", w.meaning, "#noteMeaningBlock");
+  fillNoteField("#noteContext", w.context, "#noteContextBlock");
+  fillNoteField("#noteSimple", w.simple, "#noteSimpleBlock");
+  fillNoteField("#noteArabic", w.arabic, "#noteArabicBlock");
+  const examples = $("#noteExamples");
+  const exBlock = $("#noteExamplesBlock");
+  if (examples) {
+    const lines = exampleLines(w.examples);
+    examples.innerHTML = lines.map((line) => `<p class="sentence">${escapeHtml(line)}</p>`).join("");
+    if (exBlock) exBlock.classList.toggle("hidden", !lines.length);
   }
-  if (source) source.textContent = w.docTitle || "";
+  fillNoteField("#noteSource", w.docTitle ? `From ${w.docTitle}` : "");
   const openBtn = $("#noteOpen");
   if (openBtn) {
     openBtn.dataset.docId = w.docId || "";
@@ -620,6 +649,8 @@ async function boot() {
   window.cwOpenDoc = openDoc;
   window.cwGloss = (info) => gloss(info);
   window.cwTogglePdfMode = () => reader?.togglePdfMode?.();
+  window.cwClosePanel = () => closePanel();
+  window.cwPage = (delta) => reader?.turnPage?.(delta);
   if (!window.CW) {
     $("#openFile")?.addEventListener("click", () => $("#fileInput").click());
   }
@@ -677,8 +708,8 @@ async function boot() {
   });
   $("#readMode")?.addEventListener("click", () => reader?.togglePdfMode?.());
   $("#vocabExport").addEventListener("click", () => {
-    const rows = [["word", "meaning", "sentence", "source"]].concat(
-      state.words.map((w) => [w.word, w.meaning, w.context, w.docTitle])
+    const rows = [["word", "meaning", "sentence", "simply", "arabic", "examples", "source"]].concat(
+      state.words.map((w) => [w.word, w.meaning, w.context, w.simple, w.arabic, w.examples, w.docTitle])
     );
     const csv = rows.map((r) => r.map((c) => `"${String(c || "").replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -725,8 +756,21 @@ async function boot() {
     showModal("#settingsModal", false);
   });
 
-  $("#panelClose").addEventListener("click", () => closePanel());
+  $("#panelClose").addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    closePanel();
+  });
   $("#scrim").addEventListener("click", () => closePanel());
+  $("#pagerPrev")?.addEventListener("click", () => reader?.turnPage?.(-1));
+  $("#pagerNext")?.addEventListener("click", () => reader?.turnPage?.(1));
+  document.addEventListener("keydown", (e) => {
+    if (state.view !== "reader") return;
+    if (e.target.closest?.("input, textarea, select, button")) return;
+    if (e.key === "ArrowRight") reader?.turnPage?.(1);
+    if (e.key === "ArrowLeft") reader?.turnPage?.(-1);
+    if (e.key === "Escape") closePanel();
+  });
   setupSheetDrag();
 
   $("#installDismiss")?.addEventListener("click", () => {

@@ -16,11 +16,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=Outfit:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=16">
-  <script src="{{ url_for('static', filename='js/clicks.js') }}?v=16"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=17">
+  <script src="{{ url_for('static', filename='js/clicks.js') }}?v=17"></script>
 </head>
 <body>
-  <div id="bootBar">Context Word · build 16</div>
+  <div id="bootBar">Context Word · build 17</div>
   <div class="app">
     <header class="topbar" id="topbar">
       <button class="brand" id="brand" type="button" aria-label="Context Word home" onclick="CW.home()">
@@ -43,7 +43,7 @@
     <section class="view library" id="view-library">
       <div class="setup-card" id="geminiBanner">
         <div>
-          <div class="drop-kicker">Context Word · build 16</div>
+          <div class="drop-kicker">Context Word · build 17</div>
           <h2>Paste your Gemini key once.</h2>
           <p>Then tap a word in a PDF and you’ll get Meaning, Context, and العربي ببساطة — in a side panel, not a popup.</p>
         </div>
@@ -132,8 +132,13 @@
         <div class="reader-bar">
           <button class="ghost-btn" id="backLib" type="button" onclick="CW.home()">Shelf</button>
           <div class="reader-title" id="readerTitle">Reading</div>
-          <button class="ghost-btn hidden" id="readMode" type="button">Page view</button>
-          <div class="zoom-group" id="zoomGroup">
+          <button class="ghost-btn hidden" id="readMode" type="button">Printed pages</button>
+          <div class="pager hidden" id="pager">
+            <button class="icon-btn" id="pagerPrev" type="button" aria-label="Previous page">‹</button>
+            <span id="pagerLabel">1 / 1</span>
+            <button class="icon-btn" id="pagerNext" type="button" aria-label="Next page">›</button>
+          </div>
+          <div class="zoom-group hidden" id="zoomGroup">
             <button class="icon-btn" id="zoomOut" type="button" aria-label="Zoom out">−</button>
             <button class="ghost-btn" id="zoomFit" type="button">Fit</button>
             <button class="icon-btn" id="zoomIn" type="button" aria-label="Zoom in">+</button>
@@ -147,8 +152,8 @@
         <aside class="panel" id="panel" aria-live="polite">
           <div class="panel-handle" id="panelHandle"></div>
           <div class="panel-head">
-            <div class="panel-kicker">Context Word · build 16</div>
-            <button class="icon-btn panel-close-mobile" id="panelClose" type="button" aria-label="Close">×</button>
+            <div class="panel-kicker">Context Word · build 17</div>
+            <button class="icon-btn" id="panelClose" type="button" aria-label="Close sidebar">×</button>
           </div>
           <div class="panel-body" id="panelBody"></div>
         </aside>
@@ -177,9 +182,28 @@
   <div class="backdrop hidden" id="noteModal">
     <div class="modal" role="dialog" aria-labelledby="noteWord">
       <h2 id="noteWord">Word</h2>
-      <p class="plain" id="noteMeaning"></p>
-      <p class="sentence" id="noteContext" style="margin-top:0.8rem"></p>
-      <p class="hint" id="noteSource" style="margin-top:0.8rem"></p>
+      <p class="phonetic" id="notePhonetic"></p>
+      <div class="block" id="noteMeaningBlock">
+        <h3>Here it meant</h3>
+        <p class="plain" id="noteMeaning"></p>
+      </div>
+      <div class="block" id="noteContextBlock">
+        <h3>The line you saved</h3>
+        <p class="sentence" id="noteContext"></p>
+      </div>
+      <div class="block hidden" id="noteSimpleBlock">
+        <h3>That line, simply</h3>
+        <p class="plain" id="noteSimple"></p>
+      </div>
+      <div class="block hidden" id="noteArabicBlock">
+        <h3>العربي ببساطة</h3>
+        <p class="translation" id="noteArabic" dir="rtl"></p>
+      </div>
+      <div class="block hidden" id="noteExamplesBlock">
+        <h3>Other real examples</h3>
+        <div id="noteExamples"></div>
+      </div>
+      <p class="hint" id="noteSource"></p>
       <div class="modal-actions">
         <button class="ghost-btn" id="noteSpeak" type="button">Pronounce</button>
         <button class="ghost-btn hidden" id="noteOpen" type="button">Open book</button>
@@ -272,6 +296,6 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/epubjs@0.3.93/dist/epub.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js"></script>
-  <script type="module" src="{{ url_for('static', filename='js/app.js') }}?v=16"></script>
+  <script type="module" src="{{ url_for('static', filename='js/app.js') }}?v=17"></script>
 </body>
 </html>
