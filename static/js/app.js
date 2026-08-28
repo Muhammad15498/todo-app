@@ -130,10 +130,30 @@ async function ensureSamples() {
 }
 
 async function openDoc(id) {
-  const doc = await db.getDoc(id);
-  if (!doc) return;
-  doc.lastOpened = Date.now();
-  await db.putDoc(doc);
+  let doc = id ? await db.getDoc(id) : null;
+  if (!doc) {
+    const sample = SAMPLES.find((s) => s.id === id);
+    if (!sample) {
+      toast("Could not open that yet. Try the sample again.");
+      return;
+    }
+    doc = {
+      id: sample.id,
+      title: sample.title,
+      type: "sample",
+      blurb: sample.blurb,
+      builtin: true,
+      text: sample.body
+    };
+  }
+  if ((doc.type === "sample" || doc.builtin) && !String(doc.text || "").trim()) {
+    const sample = SAMPLES.find((s) => s.id === doc.id);
+    if (sample) doc.text = sample.body;
+  }
+  if (doc.id) {
+    doc.lastOpened = Date.now();
+    db.putDoc(doc).catch(() => {});
+  }
   state.current = doc;
   showView("reader");
   await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
@@ -423,7 +443,7 @@ async function renderVocab() {
   list.innerHTML = state.words
     .map(
       (w) => `
-      <article class="vocab-item">
+      <article class="vocab-item" data-open-word="${w.id}" tabindex="0">
         <div>
           <h3>${escapeHtml(w.word)}</h3>
           <p>${escapeHtml(w.meaning)}</p>
@@ -434,6 +454,28 @@ async function renderVocab() {
       </article>`
     )
     .join("");
+}
+
+function openSavedWord(w) {
+  if (!w) return;
+  const word = $("#noteWord");
+  const meaning = $("#noteMeaning");
+  const context = $("#noteContext");
+  const source = $("#noteSource");
+  if (word) word.textContent = w.word || "";
+  if (meaning) meaning.textContent = w.meaning || "";
+  if (context) {
+    context.textContent = w.context || "";
+    context.classList.toggle("hidden", !w.context);
+  }
+  if (source) source.textContent = w.docTitle || "";
+  const openBtn = $("#noteOpen");
+  if (openBtn) {
+    openBtn.dataset.docId = w.docId || "";
+    openBtn.classList.toggle("hidden", !w.docId);
+  }
+  state.noteWord = w;
+  showModal("#noteModal", true);
 }
 
 function fillSettings() {
@@ -567,6 +609,7 @@ async function boot() {
   window.cwSaveSettings = saveSettings;
   window.cwOpenDoc = openDoc;
   window.cwGloss = (info) => gloss(info);
+  window.cwTogglePdfMode = () => reader?.togglePdfMode?.();
   if (!window.CW) {
     $("#openFile")?.addEventListener("click", () => $("#fileInput").click());
   }

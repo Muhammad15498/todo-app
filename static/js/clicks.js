@@ -10,8 +10,6 @@
   }
 
   function say(msg) {
-    var bar = el("bootBar");
-    if (bar) bar.textContent = msg;
     var t = el("toast");
     if (t) {
       t.textContent = msg;
@@ -19,7 +17,7 @@
       clearTimeout(say._t);
       say._t = setTimeout(function () {
         t.classList.remove("show");
-      }, 4000);
+      }, 2800);
     }
   }
 
@@ -608,15 +606,10 @@
                 title: "Phrases that hide",
                 text: "The committee took the delay into account and, in the end, decided to give up the old plan. Nobody wanted to make a mountain out of a molehill, but the deadline was real.\n\nMaya had carried out the first half of the work in spite of a fever. She did not look up from the page until the numbers began to make sense. We can still figure this out, she said.\n\nHighlight give up, take into account, in spite of, or any single word."
               };
-      if (window.cwOpenDoc) {
-        Promise.resolve(window.cwOpenDoc(pack.id)).then(function () {
-          var reader = el("view-reader");
-          if (reader && reader.classList.contains("hidden")) showText(pack.title, pack.text);
-        });
-        say("Opened a sample. Highlight 1–4 words.");
-        return;
-      }
       showText(pack.title, pack.text);
+      if (window.cwOpenDoc) {
+        Promise.resolve(window.cwOpenDoc(pack.id)).catch(function () {});
+      }
       say("Opened a sample. Highlight 1–4 words.");
     },
     onFiles: async function (files) {
@@ -709,6 +702,12 @@
       case "cardRules":
         CW.sample("rules");
         return true;
+      case "readMode":
+        if (window.cwTogglePdfMode) window.cwTogglePdfMode();
+        return true;
+      case "noteClose":
+        showModal("noteModal", false);
+        return true;
       case "installDismiss":
         if (el("installTip")) el("installTip").classList.add("hidden");
         return true;
@@ -720,7 +719,7 @@
   function fromEvent(e) {
     var node = e.target;
     if (!node || !node.closest) return;
-    if (node.closest("#stage, .textLayer, .prose, #panelBody")) return;
+    if (node.closest("#stage, .textLayer, .prose, #panelBody, #vocabList, .vocab-item, #bootBar")) return;
     var hit = node.closest("button, .card, #drop, [data-cw]");
     if (hit && hit.id && handle(hit.id)) {
       e.preventDefault();

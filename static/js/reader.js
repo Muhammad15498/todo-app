@@ -215,6 +215,38 @@ function textToProse(text) {
     .join("");
 }
 
+async function extractPdfPlainText(pdf) {
+  const max = Math.min(pdf.numPages || 0, 250);
+  const pages = [];
+  for (let i = 1; i <= max; i += 1) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent().catch(() => ({ items: [] }));
+    let buf = "";
+    for (const it of content.items || []) {
+      buf += it.str || "";
+      if (it.hasEOL) buf += "\n";
+      else if (buf && !/\s$/.test(buf)) buf += " ";
+    }
+    const cleaned = buf.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+    if (cleaned) pages.push(cleaned);
+  }
+  return pages.join("\n\n");
+}
+
+function setReadModeBtn(mode, hasToggle) {
+  const btn = document.getElementById("readMode");
+  const zoom = document.getElementById("zoomGroup");
+  if (!btn) return;
+  if (!hasToggle) {
+    btn.classList.add("hidden");
+    if (zoom) zoom.classList.toggle("hidden", mode === "text");
+    return;
+  }
+  btn.classList.remove("hidden");
+  btn.textContent = mode === "text" ? "Page view" : "Book view";
+  if (zoom) zoom.classList.toggle("hidden", mode === "text");
+}
+
 export class Reader {
   constructor({ stage, onGloss, getSettings }) {
     this.stage = stage;
@@ -227,6 +259,9 @@ export class Reader {
     this.zoom = 1;
     this._slots = [];
     this._drawn = new Set();
+    this._title = "";
+    this._plain = "";
+    this._pdfMode = "";
   }
 
   destroy() {
@@ -251,6 +286,24 @@ export class Reader {
     this.pdf = null;
     this._slots = [];
     this._drawn = new Set();
+    this._plain = "";
+    this._pdfMode = "";
+    this.stage.innerHTML = "";
+    setReadModeBtn("text", false);
+  }
+
+  clearStage() {
+    removeExplainButton();
+    this.cleanup.forEach((fn) => {
+      try {
+        fn();
+      } catch {
+        /* ignore */
+      }
+    });
+    this.cleanup = [];
+    this._slots = [];
+    this._drawn = new Set();
     this.stage.innerHTML = "";
   }
 
@@ -264,11 +317,29 @@ export class Reader {
   async load({ type, title, text, blob }) {
     this.destroy();
     this.zoom = 1;
+    this._title = title || "";
     this.stage.dataset.kind = type;
     if (type === "pdf") return this.loadPdf(blob);
     if (type === "epub") return this.loadEpub(blob);
     if (type === "docx") return this.loadDocx(blob);
+    setReadModeBtn("text", false);
     return this.loadText(text || "", title);
+  }
+
+  async togglePdfMode() {
+    if (!this.pdf || !this._plain) return;
+    if (this._pdfMode === "text") {
+      this.clearStage();
+      this._pdfMode = "pages";
+      this.stage.dataset.kind = "pdf";
+      setReadModeBtn("pages", true);
+      return this._renderPdfPages();
+    }
+    this.clearStage();
+    this._pdfMode = "text";
+    this.stage.dataset.kind = "txt";
+    setReadModeBtn("text", true);
+    return this.loadText(this._plain, this._title);
   }
 
   loadText(text, title) {
@@ -339,9 +410,32 @@ export class Reader {
 
   async loadPdf(blob) {
     const pdfjsLib = window.pdfjsLib;
+    if (!pdfjsLib) {
+      this.stage.innerHTML = `<p class="plain">PDF engine not loaded yet. Wait a second and try again.</p>`;
+      return;
+    }
+    this.stage.innerHTML = `<p class="plain"><span class="busy"></span> &nbsp; Opening book…</p>`;
     const data = await blob.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data }).promise;
     this.pdf = pdf;
+    const plain = await extractPdfPlainText(pdf);
+    this._plain = plain;
+    if ((plain || "").replace(/\s/g, "").length > 400) {
+      this._pdfMode = "text";
+      this.stage.innerHTML = "";
+      this.stage.dataset.kind = "txt";
+      setReadModeBtn("text", true);
+      return this.loadText(plain, this._title);
+    }
+    setReadModeBtn("pages", false);
+    this.stage.innerHTML = "";
+    this.stage.dataset.kind = "pdf";
+    return this._renderPdfPages();
+  }
+
+  async _renderPdfPages() {
+    const pdf = this.pdf;
+    if (!pdf) return;
     const scroller = document.createElement("div");
     scroller.className = "pdf-scroller";
     this.stage.appendChild(scroller);
