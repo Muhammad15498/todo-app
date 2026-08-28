@@ -6,8 +6,8 @@ const GEMINI_MODELS = [
 ];
 
 const GROQ_MODELS = [
-  "llama-3.1-8b-instant",
   "llama-3.3-70b-versatile",
+  "llama-3.1-8b-instant",
   "gemma2-9b-it"
 ];
 
@@ -62,133 +62,61 @@ function wordSafe(q) {
 }
 
 function buildCoachPrompt(word, sentence, passage) {
-  return `You are an English vocabulary coach helping a non-native English speaker understand authentic English.
+  return `You are a patient English teacher for an intelligent adult who is NOT a native speaker.
 
-The learner highlighted:
+They highlighted: "${word}"
+It sits inside this sentence: "${sentence || ""}"
+Nearby text: "${passage || ""}"
 
-"${word}"
+They are asking: I see this word in this sentence — what is the writer actually saying?
 
-The learner wants to understand the highlighted text mainly THROUGH ITS CONTEXT.
+Do NOT give a dictionary dump. First make the WHOLE SENTENCE clear. Then show what the highlighted bit is doing inside it.
+If the highlight is only part of a phrase (give up, take into account, in spite of), explain the whole phrase.
+Use extremely simple English. Never explain a hard word with another hard word.
 
-A dictionary gloss is not enough. After reading you, they should know: what it means here, what it is in real life, and how to picture it.
+RETURN ONLY:
 
-CONTEXT:
+This Sentence:
+Rewrite the FULL sentence in very simple English, as if telling a friend. The learner must understand the whole line even if they forget the hard word.
 
-Immediate text:
-"${sentence || ""}"
-
-Nearby surrounding text:
-"${passage || ""}"
-
-IMPORTANT:
-
-The highlighted text may be only PART of a larger expression.
-
-For example:
-
-"account" in "take this into account" should be understood as "take something into account".
-
-"up" in "give up" should be understood as "give up".
-
-Use the surrounding context to identify the actual expression whenever the context clearly supports it.
-
-Do not force a larger phrase if the word is genuinely being used independently.
-
-LANGUAGE:
-
-The learner is an intelligent adult but is not a native English speaker.
-
-Use extremely clear, simple English.
-
-Do not explain a difficult word using another difficult word.
-
-The learner should NOT need to look up words inside your explanation.
-
-Prefer "the way people act" over "conduct". Prefer "things people do" over "behaviours" if you are explaining "behaviours".
-
-Make the meaning obvious from the situation.
-
-RETURN ONLY THESE SECTIONS:
-
-Sounds Like:
-
-How to say it, in simple pieces. Example: bih-HAY-vyorz
-
-Meaning:
-
-One short, simple meaning of the word itself. What IS this thing in the world? If it is abstract, make it physical: what would you see, hear, or do?
-
-Context:
-
-Explain exactly what the writer means HERE. This is the MOST IMPORTANT section. Connect the word to this sentence so the learner cannot miss it.
-
-In Real Life:
-
-What this looks like outside the book. Everyday. Concrete. For "behaviours": the things people actually do — shouting, sharing, hiding, helping — not a theory. 2 short sentences.
-
-Picture It:
-
-One image the learner can close their eyes and see. If the word is abstract, invent a small scene.
-
-For Instance:
-
-Two everyday "such as..." cases, not copied from the passage. Start with "such as".
+Here it means:
+One short line: what the highlighted text is doing HERE. Not other dictionary senses.
 
 Arabic:
+Egyptian-friendly. Start with الجملة دي معناها: then the simple sentence. Then والكلمة هنا: then the word in this sentence.
 
-The SAME contextual meaning in simple Egyptian-friendly Arabic, as: "هو هنا قصده كذا..."
+Picture It:
+One small scene they can close their eyes and see.
 
-When To Use It:
-
-When a native speaker naturally says this. 1–2 short sentences.
-
-Don't Confuse:
-
-Only if ONE similar word could genuinely confuse the learner. Otherwise leave empty.
-
-Examples:
-
-TWO short natural sentences using the word.
-
-The Idea:
-
-ONE short memorable idea only if useful.
-
-STRICT RULES:
-
-Context is the priority, but In Real Life and Picture It must still be concrete.
-
-Do not make the explanation complicated.
-
-Do not use Markdown.
-
-Do not use **.
-
-Do not use bullet points.
-
-Do not use emojis.
-
-Do not repeat yourself.
-
-Use exactly:
+For Instance:
+Two everyday cases. Start with such as.
 
 Sounds Like:
-Meaning:
-Context:
-In Real Life:
-Picture It:
-For Instance:
-Arabic:
-When To Use It:
+How to say it, like: oh-PAYK
+
 Don't Confuse:
-Examples:
-The Idea:
+Only if ONE similar word would trick them. Else leave empty.
+
+EXAMPLE
+Highlighted: account
+Sentence: The committee took the delay into account.
+This Sentence: The group thought about the delay when they decided. They did not ignore it.
+Here it means: took into account = they considered it; it affected the decision.
+Arabic: الجملة دي معناها: اللجنة حسبت حساب التأخير وهي بتقرر. والكلمة هنا: take into account يعني يعتبر الحاجة دي مش يتجاهلها.
+Picture It: People at a table. One person points at a clock. The others nod and change the plan.
+For Instance: such as counting extra traffic when you choose when to leave; such as a doctor considering your other medicines before giving a new one.
+Sounds Like: uh-KOWNT
+Don't Confuse: Not a bank account. Here it is about paying attention to something.
+
+Do not use markdown, bullets, or emojis. Use exactly those headings.
 `;
 }
 
 export function parseCoach(text) {
   const result = {
     "Sounds Like": "",
+    "This Sentence": "",
+    "Here it means": "",
     Meaning: "",
     Context: "",
     "In Real Life": "",
@@ -202,6 +130,8 @@ export function parseCoach(text) {
   };
   const headings = [
     "Sounds Like:",
+    "This Sentence:",
+    "Here it means:",
     "Meaning:",
     "Context:",
     "In Real Life:",

@@ -112,6 +112,9 @@ function showExplainButton(info, onGloss) {
 }
 
 export function bindGlossEvents(root, { onGloss, getDoc }) {
+  if (!getDoc && typeof window !== "undefined" && window.CW) {
+    return () => {};
+  }
   const doc = root.ownerDocument || document;
   const win = doc.defaultView || window;
   const coarse = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;

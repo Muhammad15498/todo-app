@@ -51,7 +51,7 @@
     "gemini-2.5-flash-lite",
     "gemini-2.5-flash"
   ];
-  var GROQ_MODELS = ["llama-3.1-8b-instant", "llama-3.3-70b-versatile", "gemma2-9b-it"];
+  var GROQ_MODELS = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "gemma2-9b-it"];
 
   function skipModel(msg) {
     return /quota|rate.?limit|429|resource.?exhausted|no longer available|not available|deprecated|not found|404|not supported/i.test(
@@ -267,9 +267,66 @@
     }
   }
 
+  function extractSentence(text, word) {
+    if (!text) return "";
+    var parts = String(text).split(/(?<=[.!?])\s+/);
+    var lower = String(word || "").toLowerCase();
+    var hit = parts.filter(function (p) {
+      return p.toLowerCase().indexOf(lower) !== -1;
+    })[0];
+    return (hit || parts[0] || text).trim();
+  }
+
+  function coachPrompt(word, sentence, passage) {
+    return (
+      "You are a patient English teacher for an intelligent adult who is NOT a native speaker.\n\n" +
+      "They highlighted: \"" +
+      word +
+      "\"\n" +
+      "It sits inside this sentence: \"" +
+      sentence +
+      "\"\n" +
+      "Nearby text: \"" +
+      (passage || "").slice(0, 1800) +
+      "\"\n\n" +
+      "They are asking: I see this word in this sentence — what is the writer actually saying?\n" +
+      "Do NOT give a dictionary dump. First make the WHOLE SENTENCE clear. Then show what the highlighted bit is doing inside it.\n" +
+      "If the highlight is only part of a phrase (give up, take into account, in spite of), explain the whole phrase.\n" +
+      "Use extremely simple English. Never explain a hard word with another hard word.\n\n" +
+      "RETURN ONLY:\n\n" +
+      "This Sentence:\n" +
+      "Rewrite the FULL sentence in very simple English, as if telling a friend. The learner must understand the whole line.\n\n" +
+      "Here it means:\n" +
+      "One short line: what the highlighted text is doing HERE. Not other dictionary senses.\n\n" +
+      "Arabic:\n" +
+      "Egyptian-friendly. Start with الجملة دي معناها: then the simple sentence. Then والكلمة هنا: then the word in this sentence.\n\n" +
+      "Picture It:\n" +
+      "One small scene they can close their eyes and see.\n\n" +
+      "For Instance:\n" +
+      "Two everyday cases. Start with such as.\n\n" +
+      "Sounds Like:\n" +
+      "How to say it, like: oh-PAYK\n\n" +
+      "Don't Confuse:\n" +
+      "Only if ONE similar word would trick them. Else leave empty.\n\n" +
+      "EXAMPLE\n" +
+      "Highlighted: account\n" +
+      "Sentence: The committee took the delay into account.\n" +
+      "This Sentence: The group thought about the delay when they decided. They did not ignore it.\n" +
+      "Here it means: took into account = they considered it; it affected the decision.\n" +
+      "Arabic: الجملة دي معناها: اللجنة حسبت حساب التأخير وهي بتقرر. والكلمة هنا: take into account يعني يعتبر الحاجة دي مش يتجاهلها.\n" +
+      "Picture It: People at a table. One person points at a clock. The others nod and change the plan.\n" +
+      "For Instance: such as counting extra traffic when you choose when to leave; such as a doctor considering your other medicines before giving a new one.\n" +
+      "Sounds Like: uh-KOWNT\n" +
+      "Don't Confuse: Not a bank account. Here it is about paying attention to something.\n\n" +
+      "Do not use markdown, bullets, or emojis. Use exactly those headings."
+    );
+  }
+
   function parseCoach(text) {
     var result = {
       "Sounds Like": "",
+      "This Sentence": "",
+      "Here it means": "",
       Meaning: "",
       Context: "",
       "In Real Life": "",
@@ -327,15 +384,7 @@
       return;
     }
     try {
-      var prompt =
-        'You are an English vocabulary coach. The learner highlighted "' +
-        info.word +
-        '". Immediate sentence: "' +
-        (info.sentence || "") +
-        '". Nearby: "' +
-        (info.passage || "").slice(0, 1800) +
-        '". Use extremely clear simple English. After reading they must know what it is in real life. RETURN ONLY:\nSounds Like:\nMeaning:\nContext:\nIn Real Life:\nPicture It:\nFor Instance:\nArabic:\nWhen To Use It:\nDon\'t Confuse:\nExamples:\nThe Idea:\n';
-      var raw = await generateFree(prompt);
+      var raw = await generateFree(coachPrompt(info.word, info.sentence || "", info.passage || ""));
       var coach = parseCoach(raw);
       function block(title, text, cls) {
         if (!text || !String(text).trim()) return "";
@@ -356,14 +405,17 @@
         (coach["Sounds Like"]
           ? '<div class="meta-row"><span class="phonetic">' + escapeHtml(coach["Sounds Like"]) + "</span></div>"
           : "") +
-        block("Meaning", coach.Meaning) +
-        block("In this sentence", coach.Context) +
-        block("In real life", coach["In Real Life"]) +
+        (info.sentence
+          ? '<div class="block"><h3>The line you are reading</h3><p class="sentence">' +
+            escapeHtml(info.sentence) +
+            "</p></div>"
+          : "") +
+        block("This sentence, simply", coach["This Sentence"] || coach.Context) +
+        block("Here it means", coach["Here it means"] || coach.Meaning) +
+        block("العربي ببساطة", coach.Arabic, "translation") +
         block("Picture it", coach["Picture It"]) +
         block("For instance", coach["For Instance"]) +
-        block("العربي ببساطة", coach.Arabic, "translation") +
-        block("When to use it", coach["When To Use It"]) +
-        block("Examples", coach.Examples, "sentence");
+        block("Don't confuse", coach["Don't Confuse"]);
       var speakBtn = el("speakWord");
       if (speakBtn) {
         speakBtn.onclick = function () {
@@ -397,16 +449,14 @@
       var block = (host && host.closest && host.closest("p, li, .textLayer, article, div")) || host;
       passage = ((block && block.innerText) || raw).replace(/\s+/g, " ").trim().slice(0, 1800);
     } catch (e) {}
-    return { word: raw, sentence: passage, passage: passage };
+    return { word: raw, sentence: extractSentence(passage, raw) || passage, passage: passage };
   }
 
   function onHighlight() {
+    if (!onHighlight._armed) return;
+    onHighlight._armed = false;
     var info = selectionInStage();
     if (!info) return;
-    var now = Date.now();
-    if (info.word === onHighlight._last && now - (onHighlight._at || 0) < 800) return;
-    onHighlight._last = info.word;
-    onHighlight._at = now;
     say("Highlighted: " + info.word);
     openPanel();
     var body = el("panelBody");
@@ -414,7 +464,7 @@
       body.innerHTML =
         '<p class="plain"><span class="busy"></span> &nbsp; Understanding “' +
         escapeHtml(info.word) +
-        "”…</p>";
+        "” in this sentence…</p>";
     }
     if (window.cwGloss) window.cwGloss(info);
     else localExplain(info);
@@ -424,15 +474,32 @@
     if (bindHighlightWatch._on) return;
     bindHighlightWatch._on = true;
     var t = null;
+    function inStage(node) {
+      var stage = el("stage");
+      var reader = el("view-reader");
+      if (!stage || !reader || reader.classList.contains("hidden") || !node) return false;
+      return stage.contains(node);
+    }
+    function arm(e) {
+      onHighlight._armed = inStage(e.target);
+    }
     function kick() {
       clearTimeout(t);
-      t = setTimeout(onHighlight, 50);
+      t = setTimeout(onHighlight, 80);
     }
-    document.addEventListener("selectionchange", kick);
-    document.addEventListener("mouseup", kick, true);
+    document.addEventListener("pointerdown", arm, true);
     document.addEventListener("pointerup", kick, true);
-    document.addEventListener("keyup", kick, true);
     document.addEventListener("touchend", kick, true);
+    document.addEventListener(
+      "keyup",
+      function (e) {
+        if (e.key === "Shift" || e.shiftKey) {
+          onHighlight._armed = true;
+          kick();
+        }
+      },
+      true
+    );
   }
   bindHighlightWatch();
 
@@ -684,6 +751,6 @@
       if (el("bannerKey") && gk) el("bannerKey").value = gk;
       if (el("bannerGroq") && rq) el("bannerGroq").value = rq;
     } catch (e) {}
-    say("Context Word · build 12 · Groq first");
+    say("Context Word · build 13 · sentence first");
   });
 })();

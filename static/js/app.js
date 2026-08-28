@@ -212,7 +212,7 @@ function emptyPanelHtml() {
   return `
     <div class="panel-empty">
       <h2>Highlight 1–4 words.</h2>
-      <p>The meaning appears here as soon as you let go — Meaning, Context, and العربي ببساطة. No extra button.</p>
+      <p>Let go once. You get the whole sentence in simple English, then what the word is doing in that line.</p>
     </div>`;
 }
 
@@ -251,9 +251,11 @@ function renderPanel(data, loading) {
   }
 
   const coach = data.coach;
+  const thisSentence = (coach && (coach["This Sentence"] || coach.Context || "").trim()) || "";
+  const hereMeans = (coach && (coach["Here it means"] || coach.Meaning || "").trim()) || "";
   const mainPlain =
-    (coach && coach.Context.trim()) ||
-    (coach && coach.Meaning.trim()) ||
+    thisSentence ||
+    hereMeans ||
     data.contextual?.definition ||
     data.wiki?.extract ||
     "I could not find a dictionary entry for this. Try a slightly shorter phrase, or add a free Gemini key in Settings — the same engine as Context Word.";
@@ -263,25 +265,21 @@ function renderPanel(data, loading) {
 
   const coachHtml = coach
     ? `
-      ${coach.Meaning.trim() ? `<div class="block"><h3>Meaning</h3><p class="plain">${escapeHtml(coach.Meaning.trim())}</p></div>` : ""}
-      ${coach.Context.trim() ? `<div class="block"><h3>Context</h3><p class="plain">${escapeHtml(coach.Context.trim())}</p></div>` : ""}
-      ${coach["In Real Life"]?.trim() ? `<div class="block"><h3>In real life</h3><p class="plain">${escapeHtml(coach["In Real Life"].trim())}</p></div>` : ""}
-      ${coach["Picture It"]?.trim() ? `<div class="block"><h3>Picture it</h3><p class="plain">${escapeHtml(coach["Picture It"].trim())}</p></div>` : ""}
-      ${coach["For Instance"]?.trim() ? `<div class="block"><h3>For instance</h3><p class="plain">${escapeHtml(coach["For Instance"].trim())}</p></div>` : ""}
+      ${
+        data.sentence
+          ? `<div class="block"><h3>The line you are reading</h3><p class="sentence">${markSentence(data.sentence, data.query)}</p></div>`
+          : ""
+      }
+      ${thisSentence ? `<div class="block"><h3>This sentence, simply</h3><p class="plain">${escapeHtml(thisSentence)}</p></div>` : ""}
+      ${hereMeans ? `<div class="block"><h3>Here it means</h3><p class="plain">${escapeHtml(hereMeans)}</p></div>` : ""}
       ${
         coach.Arabic.trim()
           ? `<div class="block"><h3>العربي ببساطة</h3><p class="translation" dir="rtl">${escapeHtml(coach.Arabic.trim())}</p></div>`
           : ""
       }
-      ${
-        data.sentence
-          ? `<div class="block"><h3>As used here</h3><p class="sentence">${markSentence(data.sentence, data.query)}</p></div>`
-          : ""
-      }
-      ${coach["When To Use It"].trim() ? `<div class="block"><h3>When to use it</h3><p class="plain">${escapeHtml(coach["When To Use It"].trim())}</p></div>` : ""}
-      ${coach["Don't Confuse"].trim() ? `<div class="block"><h3>Don't confuse</h3><p class="plain">${escapeHtml(coach["Don't Confuse"].trim())}</p></div>` : ""}
-      ${coach.Examples.trim() ? `<div class="block"><h3>Examples</h3><p class="sentence">${escapeHtml(coach.Examples.trim())}</p></div>` : ""}
-      ${coach["The Idea"].trim() ? `<div class="block"><h3>The idea</h3><p class="plain">${escapeHtml(coach["The Idea"].trim())}</p></div>` : ""}
+      ${coach["Picture It"]?.trim() ? `<div class="block"><h3>Picture it</h3><p class="plain">${escapeHtml(coach["Picture It"].trim())}</p></div>` : ""}
+      ${coach["For Instance"]?.trim() ? `<div class="block"><h3>For instance</h3><p class="plain">${escapeHtml(coach["For Instance"].trim())}</p></div>` : ""}
+      ${coach["Don't Confuse"]?.trim() ? `<div class="block"><h3>Don't confuse</h3><p class="plain">${escapeHtml(coach["Don't Confuse"].trim())}</p></div>` : ""}
     `
     : `
       <div class="block">
