@@ -1005,6 +1005,17 @@ function stopVibrate(){ if(vibTimer){ clearInterval(vibTimer); vibTimer=null; } 
 var mediaRec = null, recChunks = [], recStream = null, recTimer = null, recStart = 0;
 var srOnly = null, srAcc = "";
 var recLiveText = "";
+var silentRec = false;
+function makeSilenceBlob(durMs){
+  var sr = 16000, n = Math.max(1, Math.ceil(durMs / 1000 * sr));
+  var buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+  function ws(o, s){ for(var i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); }
+  ws(0,"RIFF"); v.setUint32(4, 36 + n*2, true); ws(8,"WAVE"); ws(12,"fmt ");
+  v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,sr,true); v.setUint32(28,sr*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true);
+  ws(36,"data"); v.setUint32(40, n*2, true);
+  return new Blob([buf], { type: "audio/wav" });
+}
 var currentAudio = null;
 var SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
 
@@ -1035,7 +1046,7 @@ function startRecognition(onInterim, onFinal, onErr){
   return r;
 }
 var IS_MOBILE = /Android|iPhone|iPad|Mobi/i.test(navigator.userAgent || "");
-var APP_VERSION = "v23";
+var APP_VERSION = "v24";
 function micState(cb){
   if(navigator.permissions && navigator.permissions.query){
     navigator.permissions.query({name:"microphone"}).then(function(p){ cb(p.state); }).catch(function(){ cb("unknown"); });
@@ -1176,10 +1187,8 @@ function startRec(){
       recStream.getTracks().forEach(function(tr){ tr.stop(); });
       var blob = new Blob(recChunks, {type: mediaRec.mimeType || "audio/webm"});
       var dur = Date.now() - recStart;
-      if(blob.size < 1200 || dur < 400){
-        toast("⚠ No sound captured — check mic permission (lock icon → Microphone → Allow) and try again");
-        return;
-      }
+      if(dur < 400){ toast("⚠ Too short — tap again and speak"); return; }
+      /* quiet/silent recordings are STILL saved - the message must exist, like WhatsApp */
       var fr = new FileReader();
       fr.onload = function(){
         currentAudio = {dataUrl: fr.result, mime: blob.type, name:"rec", source:"rec"};
@@ -1224,6 +1233,16 @@ function startRec(){
     }
   }).catch(function(err){
     var m = String((err && err.name) || "");
+    if(m === "NotFoundError" || m === "DevicesNotFoundError" || m === "NotReadableError" || m === "TrackStartError" || m === "OverconstrainedError"){
+      /* NO MICROPHONE on this machine - the message still gets made (silent), like WhatsApp would */
+      silentRec = true; recStart = Date.now();
+      $("recBtn").classList.add("rec"); $("recLbl").textContent = "Stop";
+      $("recTime").textContent = "0:00";
+      recTimer = setInterval(function(){ $("recTime").textContent = fmtDur(Date.now()-recStart); }, 500);
+      $("lvlWrap").style.display = "flex"; $("lvlWrap").classList.add("listening");
+      $("interim").textContent = "🔴 No microphone found — still recording the message (silent). Tap Stop when done.";
+      return;
+    }
     aiCard(m === "NotAllowedError" ? "🎤 Microphone is BLOCKED" : "🎤 Mic unavailable",
       m === "NotAllowedError"
         ? "Tap the 🔒 icon next to the address bar → Microphone → Allow, then reload."
@@ -1231,6 +1250,24 @@ function startRec(){
   });
 }
 function stopRec(){
+  if(silentRec){
+    silentRec = false;
+    clearInterval(recTimer);
+    $("recBtn").classList.remove("rec"); $("recLbl").textContent = "Record";
+    $("recTime").textContent = "0:00";
+    $("lvlWrap").classList.remove("listening"); stopMeter();
+    var sDur = Date.now() - recStart;
+    if(sDur < 800){ toast("⚠ Too short — hold for a second"); return; }
+    var sfr = new FileReader();
+    sfr.onload = function(){
+      currentAudio = {dataUrl: sfr.result, mime: "audio/wav", name: "rec", source: "rec", silent: true};
+      updateAttach();
+      $("attLbl").textContent = "🎙 " + fmtDur(sDur) + " — tap ▶ to play (no mic: silent)";
+      toast("🎙 Voice message saved (" + fmtDur(sDur) + ", silent — no mic on this device)");
+    };
+    sfr.readAsDataURL(makeSilenceBlob(sDur));
+    return;
+  }
   if(srOnly){
     try{ if(srOnly.stop) srOnly.stop(); }catch(e){}
     srOnly = null;
@@ -1270,6 +1307,8 @@ $("fileIn").onchange = function(){
   fr.onload = function(){
     currentAudio = {dataUrl: fr.result, mime: f.type || "audio/ogg", name: f.name, source:"up"};
     updateAttach();
+    $("attLbl").textContent = "📎 " + f.name + " — tap ▶ to play";
+    if(!geminiKey && !groqKey){ toast("📎 Voice note loaded — transcribe it anytime with 🤖"); return; }
     transcribeAudio();
   };
   fr.readAsDataURL(f);
