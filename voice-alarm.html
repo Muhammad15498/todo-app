@@ -1035,7 +1035,7 @@ function startRecognition(onInterim, onFinal, onErr){
   return r;
 }
 var IS_MOBILE = /Android|iPhone|iPad|Mobi/i.test(navigator.userAgent || "");
-var APP_VERSION = "v21";
+var APP_VERSION = "v22";
 function micState(cb){
   if(navigator.permissions && navigator.permissions.query){
     navigator.permissions.query({name:"microphone"}).then(function(p){ cb(p.state); }).catch(function(){ cb("unknown"); });
@@ -1083,7 +1083,7 @@ function startRec(){
     toast("🎤 Recording not supported here — upload a voice note instead"); return;
   }
   var cloudAudioReady = (enginePref === "gemini" && geminiKey) || (enginePref === "groq" && groqKey);
-  if(IS_MOBILE && !cloudAudioReady){
+  if(false && IS_MOBILE && !cloudAudioReady){ /* v22: phone always records the FILE first - WhatsApp style */
     /* FREE TRANSCRIPT MODE: Google's built-in speech engine, live, zero downloads */
     if(!SpeechRec){
       aiCard("⛔ This browser can't do live transcription",
@@ -1184,6 +1184,7 @@ function startRec(){
       fr.onload = function(){
         currentAudio = {dataUrl: fr.result, mime: blob.type, name:"rec", source:"rec"};
         updateAttach();
+        $("attLbl").textContent = "🎙 " + fmtDur(dur) + " — tap ▶ to play";
         if(recLiveText && !geminiKey){
           /* FREE instant path: live-typed text + recorded audio, zero downloads */
           finalizePipeline({ transcript: recLiveText, reminders: splitReminders(recLiveText) }, "rule");
@@ -1201,7 +1202,7 @@ function startRec(){
     startMeter(stream);   /* live sound bars like Instagram */
     if(IS_MOBILE){
       /* Android: SpeechRecognition and MediaRecorder fight over the mic -> record solo */
-      $("interim").textContent = "🔴 Recording… speak now — transcription runs after you stop.";
+      $("interim").textContent = "🔴 Recording (like WhatsApp)… speak, then tap Stop — your voice note will appear below.";
     } else {
       var r = startRecognition(
         function(all){ $("interim").innerHTML = "<span class='got'>" + esc(all) + "</span>"; },
@@ -1867,7 +1868,7 @@ async function transcribeAudio(){
     } else if(enginePref === "local") {
       await localWhisper(currentAudio.dataUrl);
     } else {
-      aiCard("⚠ No key for the selected engine — choose your path",
+      aiCard("✓ Recording saved (player above) — now choose transcription",
         "⭐ BEST FREE: Groq — free key at console.groq.com/keys (email, no card) → mixed Arabic/English recording, seconds\n" +
         "• Gemini key: console.cloud.google.com → Generative Language API → Credentials\n" +
         "• 💻 Local engine: deliberate one-time model download\n" +
