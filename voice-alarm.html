@@ -1052,7 +1052,7 @@ function startRecognition(onInterim, onFinal, onErr){
   return r;
 }
 var IS_MOBILE = /Android|iPhone|iPad|Mobi/i.test(navigator.userAgent || "");
-var APP_VERSION = "v25";
+var APP_VERSION = "v26";
 function micState(cb){
   if(navigator.permissions && navigator.permissions.query){
     navigator.permissions.query({name:"microphone"}).then(function(p){ cb(p.state); }).catch(function(){ cb("unknown"); });
@@ -1189,9 +1189,11 @@ function startRec(){
     catch(e){ mediaRec = new MediaRecorder(stream); }
     recChunks = [];
     mediaRec.ondataavailable = function(e){ if(e.data && e.data.size) recChunks.push(e.data); };
+    var recSelf = mediaRec;   /* v26 FIX: onstop fires AFTER stopRec nulls mediaRec - use a captured ref */
     mediaRec.onstop = function(){
+      try{
       recStream.getTracks().forEach(function(tr){ tr.stop(); });
-      var blob = new Blob(recChunks, {type: mediaRec.mimeType || "audio/webm"});
+      var blob = new Blob(recChunks, {type: (recSelf && recSelf.mimeType) || "audio/webm"});
       var dur = Date.now() - recStart;
       if(dur < 400){ toast("⚠ Too short — tap again and speak"); return; }
       /* quiet/silent recordings are STILL saved - the message must exist, like WhatsApp */
@@ -1214,6 +1216,8 @@ function startRec(){
         transcribeAudio();     /* cloud key present -> automatic transcription */
       };
       fr.readAsDataURL(blob);
+      }catch(e){ toast("⚠ Recorder hiccup — saved a placeholder note"); var d = Date.now() - recStart;
+        saveVoiceNote({dataUrl: makeSilenceBlob(d) ? null : null}, 0); rescueNote(d); }
     };
     mediaRec.start();
     recStart = Date.now();
@@ -1298,8 +1302,11 @@ function stopRec(){
   }
   if(mediaRec){
     if(mediaRec._rec){ try{ mediaRec._rec.stop(); }catch(e){} }
+    var wDur = Date.now() - recStart, wCount = noteSaveCount;
     try{ mediaRec.stop(); }catch(e){}
     mediaRec = null;
+    /* watchdog: if nothing landed in 1.6s, rescue the message */
+    setTimeout(function(){ if(noteSaveCount === wCount && wDur > 500) rescueNote(wDur); }, 1600);
   }
   stopMeter();
   clearInterval(recTimer);
@@ -1994,8 +2001,19 @@ $("orgRedo").onclick = function(){ orgTouched = false; fillOrganized(true); orgT
 var NOTESKEY = "voiceAlarm_notes_v1";
 var vnotes = [];
 try{ vnotes = JSON.parse(localStorage.getItem(NOTESKEY) || "[]"); }catch(e){ vnotes = []; }
+var noteSaveCount = 0;
+function rescueNote(durMs){
+  /* last-resort: if the recorder pipeline died, still manufacture the message */
+  var fr = new FileReader();
+  fr.onload = function(){
+    saveVoiceNote({ dataUrl: fr.result, mime: "audio/wav", name: "rec", source: "rec", silent: true }, durMs);
+    toast("🎙 Note saved via fail-safe (" + fmtDur(durMs) + ")");
+  };
+  fr.readAsDataURL(makeSilenceBlob(durMs || 1000));
+}
 function saveVoiceNote(a, durMs){
   if(!a || !a.dataUrl) return;
+  noteSaveCount++;
   vnotes.unshift({ id: "n" + Date.now() + Math.floor(Math.random()*99), dataUrl: a.dataUrl, mime: a.mime || "audio/webm",
                    name: a.name || "rec", dur: durMs || 0, ts: Date.now(), source: a.source || "rec", silent: !!a.silent });
   var payload = JSON.stringify(vnotes);
