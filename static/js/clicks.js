@@ -597,6 +597,12 @@
                 title: "Quiet machines",
                 text: "The engine did not fail so much as it declined to continue. The fault was opaque at first. She isolated the circuit, mitigated the heat, and waited. She was sanguine about the repair. Ubiquitous sensors make every engine a little more honest.\n\nHighlight opaque, mitigate, sanguine, or ubiquitous."
               }
+            : which === "rules"
+              ? {
+                  id: "sample-rules",
+                  title: "A few rules worth keeping",
+                  text: "Keep your word, even when it is inconvenient. A small promise kept is worth more than a grand plan that never lands. In the long run, this is how trust is built.\n\nTake the slight in stride. Most of it is carelessness, not a plot. Leave a little room in the day. Empty time is not wasted.\n\nHighlight keep your word, in the long run, take it in stride, or make room."
+                }
             : {
                 id: "sample-phrases",
                 title: "Phrases that hide",
@@ -700,6 +706,9 @@
       case "cardScience":
         CW.sample("science");
         return true;
+      case "cardRules":
+        CW.sample("rules");
+        return true;
       case "installDismiss":
         if (el("installTip")) el("installTip").classList.add("hidden");
         return true;
@@ -751,6 +760,6 @@
       if (el("bannerKey") && gk) el("bannerKey").value = gk;
       if (el("bannerGroq") && rq) el("bannerGroq").value = rq;
     } catch (e) {}
-    say("Context Word · build 13 · sentence first");
+    say("Context Word · build 14 · sentence first");
   });
 })();

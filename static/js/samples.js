@@ -39,5 +39,42 @@ She was sanguine about the repair. Not because it was trivial, but because she h
 The manual spoke of tolerances, of thermal expansion, of a valve that might stick after a long idle. She worked by feel as much as by the screen. When the numbers came back into range she let the engine idle, listening. It was not silent — nothing honest is — but it was quiet in the way a library is quiet: full of small, legitimate sounds.
 
 Outside, the evening was already going. She wiped her hands, closed the bay, and made a note to order the part. A good repair, she thought, is not a victory over the machine. It is a translation. You listen until you can say, in plain language, what it was trying to tell you.`
+  },
+  {
+    id: "sample-rules",
+    title: "A few rules worth keeping",
+    type: "sample",
+    blurb: "Short rules, book-like. Highlight keep your word, take it in stride, make room.",
+    body: `Keep your word, even when it is inconvenient.
+
+If you said you would come, come. If you said you would send it by Friday, send it. People do not remember your excuses as clearly as they remember the gap you left. A small promise kept is worth more than a grand plan that never lands. In the long run, this is how trust is built — not with speeches, but with showing up when it would have been easier not to.
+
+Do not wait to be in the mood.
+
+The mood is a poor manager. If you only work, write, call, or tidy when you feel like it, the important things will wait forever. Start in a small way. Five honest minutes often do more than an hour of circling the task. Once you begin, the mood has a habit of catching up.
+
+Leave a little room in the day.
+
+A packed schedule looks impressive and then it snaps. Traffic, a neighbour, a child, a slow email — life does not ask permission. If every hour is spoken for, the first delay ruins the rest. Make room on purpose. Empty time is not wasted. It is how you absorb what actually happens.
+
+Take the slight in stride.
+
+Someone will forget your name, talk over you, or fail to thank you. Most of it is carelessness, not a plot. If you collect every slight, you will walk around heavy. Take it in stride: notice it, then put it down. Save your anger for the rare thing that is truly unjust.
+
+Notice who is quiet.
+
+The loudest person in the room is not always the one who knows. Watch who listens. Watch who does the work without announcing it. A quiet colleague may be carrying more than they say. Ask them what they think, and then wait. People tell the truth if you give them a pause.
+
+Finish the small thing before you start the grand one.
+
+Unfinished small things pile up and steal your attention. A reply, a bill, a sink, a promise to ring your mother — each one is light on its own and heavy in a heap. Clear a little ground. Then the larger work has somewhere to stand.
+
+Be kind when you are tired.
+
+Tiredness makes a sharp tongue. The people closest to you usually receive the leftover version of you, not the polite one you take to work. Hold your tongue for one extra beat. Kindness at the end of a long day is not softness. It is discipline.
+
+None of this is new. You have heard versions of it from a parent, a teacher, a book you meant to finish. The point is not to collect rules. The point is to pick two and keep them when nobody is watching.
+
+Highlight keep your word, in the long run, take it in stride, make room, or any single word. The panel should tell you what this sentence is saying — not a dictionary entry.`
   }
 ];
