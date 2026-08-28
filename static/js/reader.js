@@ -222,20 +222,75 @@ function textToProse(text) {
     .join("");
 }
 
+function collapseLetterLine(line) {
+  const lead = line.match(/^\s*/)?.[0] || "";
+  const tokens = line.trim().split(/\s+/);
+  if (tokens.length < 4) return line;
+  const tiny = tokens.filter(
+    (t) => t.length <= 1 || /^[A-Za-z]['’]$/.test(t) || /^['’,.;:!?]$/.test(t)
+  ).length;
+  if (tiny / tokens.length < 0.7) return line;
+  let out = "";
+  for (const t of tokens) {
+    if (t === "'" || t === "’") out += "'";
+    else if (/^['’,.;:!?]$/.test(t)) out += t + " ";
+    else out += t;
+  }
+  return (
+    lead +
+    out
+      .replace(/([A-Za-z])(\d)/g, "$1 $2")
+      .replace(/(\d)([A-Za-z])/g, "$1 $2")
+      .replace(/\s+/g, " ")
+      .trim()
+  );
+}
+
+function repairSpacedLetters(text) {
+  return String(text || "")
+    .split("\n")
+    .map(collapseLetterLine)
+    .join("\n");
+}
+
+function itemsToText(content) {
+  const items = content.items || [];
+  let buf = "";
+  let prev = null;
+  for (const it of items) {
+    const str = it.str || "";
+    const tx = it.transform || [1, 0, 0, 1, 0, 0];
+    const fontH = Math.hypot(tx[2], tx[3]) || 12;
+    const x = tx[4];
+    const y = tx[5];
+    const width = typeof it.width === "number" ? it.width : fontH * Math.max(str.length, 1) * 0.5;
+    if (prev) {
+      const newLine = it.hasEOL || Math.abs(y - prev.y) > prev.fontH * 0.55;
+      if (newLine) buf += "\n";
+      else {
+        const gap = x - prev.endX;
+        const bothShort = String(prev.str || "").trim().length <= 2 && str.trim().length <= 2;
+        if (bothShort) {
+          if (gap > fontH * 0.72) buf += " ";
+        } else if (buf && !/\s$/.test(buf) && !/^\s/.test(str) && gap > fontH * 0.12) {
+          buf += " ";
+        }
+      }
+    }
+    buf += str;
+    if (it.hasEOL) buf += "\n";
+    prev = { str, y, fontH, endX: x + width };
+  }
+  return repairSpacedLetters(buf.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim());
+}
+
 async function extractPdfPages(pdf) {
   const max = Math.min(pdf.numPages || 0, 250);
   const pages = [];
   for (let i = 1; i <= max; i += 1) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent().catch(() => ({ items: [] }));
-    let buf = "";
-    for (const it of content.items || []) {
-      buf += it.str || "";
-      if (it.hasEOL) buf += "\n";
-      else if (buf && !/\s$/.test(buf)) buf += " ";
-    }
-    const cleaned = buf.replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
-    pages.push(cleaned);
+    pages.push(itemsToText(content));
   }
   return pages;
 }

@@ -752,7 +752,7 @@
   function fromEvent(e) {
     var node = e.target;
     if (!node || !node.closest) return;
-    if (node.closest("#stage, .textLayer, .prose, #panelBody, #vocabList, .vocab-item, #bootBar")) return;
+    if (node.closest("#stage, .textLayer, .prose, #panelBody, #vocabList, .vocab-item, #bootBar, #panelResizer")) return;
     var hit = node.closest("button, .card, #drop, [data-cw]");
     if (hit && hit.id && handle(hit.id)) {
       e.preventDefault();

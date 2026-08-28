@@ -70,7 +70,7 @@ Nearby text: "${passage || ""}"
 
 They are asking: I see this word in this sentence — what is the writer actually saying?
 
-Do NOT give a dictionary dump. First make the WHOLE SENTENCE clear. Then show what the highlighted bit is doing inside it.
+Do NOT give a dictionary dump. First make the WHOLE SENTENCE clear. Then the word itself. Then this line. Then what a human would take it to mean.
 If the highlight is only part of a phrase (give up, take into account, in spite of), explain the whole phrase.
 Use extremely simple English. Never explain a hard word with another hard word.
 
@@ -79,8 +79,17 @@ RETURN ONLY:
 This Sentence:
 Rewrite the FULL sentence in very simple English, as if telling a friend. The learner must understand the whole line even if they forget the hard word.
 
+The Word:
+One short line: what this word or phrase usually means, even outside this book.
+
 Here it means:
 One short line: what the highlighted text is doing HERE. Not other dictionary senses.
+
+What they mean:
+One short line: why the writer said THESE words here. The point they are making. Think like a human in the room, not a dictionary.
+
+How people hear it:
+One short line: how a native speaker takes it — tone, attitude, feeling. Not your personal opinion. What people would understand. Leave empty if the word has no extra colour.
 
 Arabic:
 Egyptian-friendly. Start with الجملة دي معناها: then the simple sentence. Then والكلمة هنا: then the word in this sentence.
@@ -101,10 +110,15 @@ EXAMPLE
 Highlighted: account
 Sentence: The committee took the delay into account.
 This Sentence: The group thought about the delay when they decided. They did not ignore it.
+The Word: account = a record of money, or paying attention to something.
 Here it means: took into account = they considered it; it affected the decision.
+What they mean: They are saying the delay was not ignored. It changed what they decided.
+How people hear it: Careful and fair — they weighed the delay instead of brushing it off.
 Arabic: الجملة دي معناها: اللجنة حسبت حساب التأخير وهي بتقرر. والكلمة هنا: take into account يعني يعتبر الحاجة دي مش يتجاهلها.
 Picture It: People at a table. One person points at a clock. The others nod and change the plan.
-For Instance: such as counting extra traffic when you choose when to leave; such as a doctor considering your other medicines before giving a new one.
+For Instance:
+We took the rain into account and left twenty minutes early.
+The doctor took her other medicines into account before choosing a new one.
 Sounds Like: uh-KOWNT
 Don't Confuse: Not a bank account. Here it is about paying attention to something.
 
@@ -116,7 +130,10 @@ export function parseCoach(text) {
   const result = {
     "Sounds Like": "",
     "This Sentence": "",
+    "The Word": "",
     "Here it means": "",
+    "What they mean": "",
+    "How people hear it": "",
     Meaning: "",
     Context: "",
     "In Real Life": "",
@@ -129,8 +146,11 @@ export function parseCoach(text) {
     "The Idea": ""
   };
   const headings = [
+    "How people hear it:",
+    "What they mean:",
     "Sounds Like:",
     "This Sentence:",
+    "The Word:",
     "Here it means:",
     "Meaning:",
     "Context:",
@@ -165,7 +185,7 @@ function cacheKey(q, sentence) {
 
 function cacheGet(id) {
   try {
-    const raw = sessionStorage.getItem("cw-coach:" + id);
+    const raw = sessionStorage.getItem("cw-coach2:" + id);
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
@@ -264,11 +284,46 @@ export async function testGemini(key) {
   return text.trim();
 }
 
+function voiceScore(v) {
+  const n = String(v.name || "").toLowerCase();
+  let s = 0;
+  if (/natural|neural|online|premium|enhanced|wavenet|studio|google|microsoft|samantha|siri|aria|jenny|guy|sara|libby|sonner|daniel|moira|karen|ravi|zira|susan/.test(n)) s += 6;
+  if (/google us english|microsoft aria|microsoft jenny/.test(n)) s += 4;
+  if (v.localService === false) s += 3;
+  if (/^en-US/i.test(v.lang)) s += 2;
+  else if (/^en/i.test(v.lang)) s += 1;
+  if (/compact|robot|espeak|flite|dumb/.test(n)) s -= 8;
+  return s;
+}
+
+function bestVoice() {
+  const voices = window.speechSynthesis.getVoices() || [];
+  const en = voices.filter((v) => /^en/i.test(v.lang || ""));
+  const pool = en.length ? en : voices;
+  if (!pool.length) return null;
+  return [...pool].sort((a, b) => voiceScore(b) - voiceScore(a))[0];
+}
+
 export function speak(text, lang = "en") {
   if (!text || !window.speechSynthesis) return;
-  window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  u.lang = lang.startsWith("en") ? "en-US" : lang;
-  u.rate = 0.92;
-  window.speechSynthesis.speak(u);
+  const go = () => {
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    const v = bestVoice();
+    if (v) {
+      u.voice = v;
+      u.lang = v.lang || "en-US";
+    } else {
+      u.lang = lang.startsWith("en") ? "en-US" : lang;
+    }
+    u.rate = 0.9;
+    u.pitch = 1;
+    window.speechSynthesis.speak(u);
+  };
+  if (!(window.speechSynthesis.getVoices() || []).length) {
+    window.speechSynthesis.addEventListener("voiceschanged", go, { once: true });
+    setTimeout(go, 280);
+    return;
+  }
+  go();
 }

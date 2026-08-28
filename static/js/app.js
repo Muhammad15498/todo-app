@@ -297,7 +297,10 @@ function renderPanel(data, loading) {
 
   const coach = data.coach;
   const thisSentence = (coach && (coach["This Sentence"] || coach.Context || "").trim()) || "";
+  const theWord = (coach && (coach["The Word"] || "").trim()) || "";
   const hereMeans = (coach && (coach["Here it means"] || coach.Meaning || "").trim()) || "";
+  const theyMean = (coach && (coach["What they mean"] || "").trim()) || "";
+  const peopleHear = (coach && (coach["How people hear it"] || coach["The Idea"] || "").trim()) || "";
   const mainPlain =
     thisSentence ||
     hereMeans ||
@@ -316,7 +319,10 @@ function renderPanel(data, loading) {
           : ""
       }
       ${thisSentence ? `<div class="block"><h3>This sentence, simply</h3><p class="plain">${escapeHtml(thisSentence)}</p></div>` : ""}
+      ${theWord ? `<div class="block"><h3>The word itself</h3><p class="plain">${escapeHtml(theWord)}</p></div>` : ""}
       ${hereMeans ? `<div class="block"><h3>Here it means</h3><p class="plain">${escapeHtml(hereMeans)}</p></div>` : ""}
+      ${theyMean ? `<div class="block"><h3>What they mean by saying it</h3><p class="plain">${escapeHtml(theyMean)}</p></div>` : ""}
+      ${peopleHear ? `<div class="block"><h3>How people hear it</h3><p class="plain">${escapeHtml(peopleHear)}</p></div>` : ""}
       ${
         coach.Arabic.trim()
           ? `<div class="block"><h3>العربي ببساطة</h3><p class="translation" dir="rtl">${escapeHtml(coach.Arabic.trim())}</p></div>`
@@ -444,11 +450,21 @@ async function gloss(info) {
 }
 
 async function saveWord(data, meaning) {
+  const coach = data.coach || {};
+  const here = (coach["Here it means"] || coach.Meaning || meaning || "").trim();
   await db.putWord({
     id: uid(),
     word: data.headword || data.query,
-    meaning,
+    meaning: here,
+    wordMeaning: (coach["The Word"] || "").trim(),
+    theyMean: (coach["What they mean"] || "").trim(),
+    peopleHear: (coach["How people hear it"] || "").trim(),
+    simple: (coach["This Sentence"] || coach.Context || "").trim(),
     context: data.sentence || "",
+    arabic: (coach.Arabic || data.translation || "").trim(),
+    examples: (coach["For Instance"] || "").trim(),
+    picture: (coach["Picture It"] || "").trim(),
+    phonetic: (coach["Sounds Like"] || data.phonetic || "").trim(),
     docId: state.current?.id || "",
     docTitle: state.current?.title || "",
     savedAt: Date.now()
@@ -494,6 +510,9 @@ function openSavedWord(w) {
   fillNoteField("#noteWord", w.word);
   fillNoteField("#notePhonetic", w.phonetic);
   fillNoteField("#noteMeaning", w.meaning, "#noteMeaningBlock");
+  fillNoteField("#noteWordMeaning", w.wordMeaning, "#noteWordMeaningBlock");
+  fillNoteField("#noteTheyMean", w.theyMean, "#noteTheyMeanBlock");
+  fillNoteField("#notePeopleHear", w.peopleHear, "#notePeopleHearBlock");
   fillNoteField("#noteContext", w.context, "#noteContextBlock");
   fillNoteField("#noteSimple", w.simple, "#noteSimpleBlock");
   fillNoteField("#noteArabic", w.arabic, "#noteArabicBlock");
@@ -625,9 +644,51 @@ function persistLocalSettings() {
   }
 }
 
+function applyPanelWidth(px) {
+  const w = Math.round(Math.min(640, Math.max(240, Number(px) || 392)));
+  document.documentElement.style.setProperty("--panel-w", `${w}px`);
+  try {
+    localStorage.setItem("cw-panel-w", String(w));
+  } catch {
+    /* ignore */
+  }
+}
+
+function setupPanelResize() {
+  const handle = $("#panelResizer");
+  const panel = $("#panel");
+  if (!handle || !panel) return;
+  try {
+    const saved = Number(localStorage.getItem("cw-panel-w"));
+    if (saved >= 240 && saved <= 640) applyPanelWidth(saved);
+  } catch {
+    /* ignore */
+  }
+  let startX = 0;
+  let startW = 0;
+  const onMove = (e) => {
+    applyPanelWidth(startW + (startX - e.clientX));
+  };
+  const onUp = () => {
+    document.body.classList.remove("cw-resizing");
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", onUp);
+  };
+  handle.addEventListener("pointerdown", (e) => {
+    if (e.button != null && e.button !== 0) return;
+    e.preventDefault();
+    startX = e.clientX;
+    startW = panel.getBoundingClientRect().width;
+    document.body.classList.add("cw-resizing");
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  });
+}
+
 async function boot() {
   loadLocalSettings();
   applyTheme();
+  setupPanelResize();
   syncGeminiBanner();
 
   reader = new Reader({
