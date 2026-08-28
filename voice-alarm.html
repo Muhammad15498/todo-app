@@ -1035,7 +1035,7 @@ function startRecognition(onInterim, onFinal, onErr){
   return r;
 }
 var IS_MOBILE = /Android|iPhone|iPad|Mobi/i.test(navigator.userAgent || "");
-var APP_VERSION = "v22";
+var APP_VERSION = "v23";
 function micState(cb){
   if(navigator.permissions && navigator.permissions.query){
     navigator.permissions.query({name:"microphone"}).then(function(p){ cb(p.state); }).catch(function(){ cb("unknown"); });
@@ -1186,11 +1186,16 @@ function startRec(){
         updateAttach();
         $("attLbl").textContent = "🎙 " + fmtDur(dur) + " — tap ▶ to play";
         if(recLiveText && !geminiKey){
-          /* FREE instant path: live-typed text + recorded audio, zero downloads */
+          /* desktop bonus: live-typed text + recorded audio, zero downloads */
           finalizePipeline({ transcript: recLiveText, reminders: splitReminders(recLiveText) }, "rule");
           return;
         }
-        transcribeAudio();     /* key present (cloud) or local engine chosen */
+        if(!geminiKey && !groqKey){
+          /* WhatsApp-simple: message saved. Transcribe later via the 🤖 button - no cards, no noise */
+          toast("🎙 Voice note saved — transcribe it anytime with 🤖");
+          return;
+        }
+        transcribeAudio();     /* cloud key present -> automatic transcription */
       };
       fr.readAsDataURL(blob);
     };
