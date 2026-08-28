@@ -351,6 +351,12 @@
     <div id="list"></div>
   </div>
 
+  <!-- VOICE NOTES LIBRARY -->
+  <div class="card">
+    <div class="lbl">🎙 Voice notes — saved on this device</div>
+    <div id="notesList"></div>
+  </div>
+
   <!-- HISTORY -->
   <div class="card">
     <div class="row" style="justify-content:space-between">
@@ -1046,7 +1052,7 @@ function startRecognition(onInterim, onFinal, onErr){
   return r;
 }
 var IS_MOBILE = /Android|iPhone|iPad|Mobi/i.test(navigator.userAgent || "");
-var APP_VERSION = "v24";
+var APP_VERSION = "v25";
 function micState(cb){
   if(navigator.permissions && navigator.permissions.query){
     navigator.permissions.query({name:"microphone"}).then(function(p){ cb(p.state); }).catch(function(){ cb("unknown"); });
@@ -1194,6 +1200,7 @@ function startRec(){
         currentAudio = {dataUrl: fr.result, mime: blob.type, name:"rec", source:"rec"};
         updateAttach();
         $("attLbl").textContent = "🎙 " + fmtDur(dur) + " — tap ▶ to play";
+        saveVoiceNote(currentAudio, dur);
         if(recLiveText && !geminiKey){
           /* desktop bonus: live-typed text + recorded audio, zero downloads */
           finalizePipeline({ transcript: recLiveText, reminders: splitReminders(recLiveText) }, "rule");
@@ -1233,7 +1240,8 @@ function startRec(){
     }
   }).catch(function(err){
     var m = String((err && err.name) || "");
-    if(m === "NotFoundError" || m === "DevicesNotFoundError" || m === "NotReadableError" || m === "TrackStartError" || m === "OverconstrainedError"){
+    {
+      /* v25: ANY mic failure still makes the message (silent) - no guessing error names */
       /* NO MICROPHONE on this machine - the message still gets made (silent), like WhatsApp would */
       silentRec = true; recStart = Date.now();
       $("recBtn").classList.add("rec"); $("recLbl").textContent = "Stop";
@@ -1264,6 +1272,7 @@ function stopRec(){
       updateAttach();
       $("attLbl").textContent = "🎙 " + fmtDur(sDur) + " — tap ▶ to play (no mic: silent)";
       toast("🎙 Voice message saved (" + fmtDur(sDur) + ", silent — no mic on this device)");
+      saveVoiceNote(currentAudio, sDur);
     };
     sfr.readAsDataURL(makeSilenceBlob(sDur));
     return;
@@ -1308,6 +1317,7 @@ $("fileIn").onchange = function(){
     currentAudio = {dataUrl: fr.result, mime: f.type || "audio/ogg", name: f.name, source:"up"};
     updateAttach();
     $("attLbl").textContent = "📎 " + f.name + " — tap ▶ to play";
+    saveVoiceNote(currentAudio, 0);
     if(!geminiKey && !groqKey){ toast("📎 Voice note loaded — transcribe it anytime with 🤖"); return; }
     transcribeAudio();
   };
@@ -1980,6 +1990,56 @@ $("orgTitle").addEventListener("input", function(){ orgTouched = true; });
 $("orgBullets").addEventListener("input", function(){ orgTouched = true; });
 $("orgRedo").onclick = function(){ orgTouched = false; fillOrganized(true); orgTouched = false; };
 
+/* ============ voice notes library (the answer to "saved where?") ============ */
+var NOTESKEY = "voiceAlarm_notes_v1";
+var vnotes = [];
+try{ vnotes = JSON.parse(localStorage.getItem(NOTESKEY) || "[]"); }catch(e){ vnotes = []; }
+function saveVoiceNote(a, durMs){
+  if(!a || !a.dataUrl) return;
+  vnotes.unshift({ id: "n" + Date.now() + Math.floor(Math.random()*99), dataUrl: a.dataUrl, mime: a.mime || "audio/webm",
+                   name: a.name || "rec", dur: durMs || 0, ts: Date.now(), source: a.source || "rec", silent: !!a.silent });
+  var payload = JSON.stringify(vnotes);
+  while(payload.length > 4200000 && vnotes.length > 1){ vnotes.pop(); payload = JSON.stringify(vnotes); }
+  try{ localStorage.setItem(NOTESKEY, payload); }catch(e){}
+  renderNotes();
+}
+function renderNotes(){
+  var host = $("notesList");
+  if(!vnotes.length){
+    host.innerHTML = "<div class='empty'>Nothing yet — every recording (mic, upload, even silent test notes) lands here permanently. Play them anytime.</div>";
+    return;
+  }
+  host.innerHTML = vnotes.map(function(n){
+    var label = (n.source === "up" ? "📎 " : "🎙 ") +
+      (n.dur ? fmtDur(n.dur) : n.name) + (n.silent ? " (silent)" : "") +
+      " · " + new Date(n.ts).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+    return "<div class='dayItem' style='margin-bottom:8px'>" +
+      "<div class='row' style='justify-content:space-between'><div class='dm' style='margin:0'>" + esc(label) + "</div>" +
+      "<div class='row'>" +
+        "<button class='x' data-nuse='" + n.id + "'>🤖</button>" +
+        "<button class='x' data-ndel='" + n.id + "'>✖</button>" +
+      "</div></div>" +
+      "<audio controls preload='none' src='" + n.dataUrl + "' style='width:100%;height:36px;margin-top:6px'></audio>" +
+    "</div>";
+  }).join("");
+  host.querySelectorAll("[data-ndel]").forEach(function(b){
+    b.onclick = function(){ vnotes = vnotes.filter(function(x){ return x.id !== b.getAttribute("data-ndel"); });
+      try{ localStorage.setItem(NOTESKEY, JSON.stringify(vnotes)); }catch(e){}
+      renderNotes(); };
+  });
+  host.querySelectorAll("[data-nuse]").forEach(function(b){
+    b.onclick = function(){
+      var n = null;
+      vnotes.forEach(function(x){ if(x.id === b.getAttribute("data-nuse")) n = x; });
+      if(!n) return;
+      currentAudio = { dataUrl: n.dataUrl, mime: n.mime, name: n.name, source: n.source };
+      updateAttach();
+      document.querySelector(".card").scrollIntoView({behavior:"smooth"});
+      transcribeAudio();
+    };
+  });
+}
+
 /* ============ time status line ============ */
 function updateTimeStatus(){
   var el = $("timeStatus"), text = $("taskText").value.trim();
@@ -2253,6 +2313,7 @@ $("testChip").onclick = function(){
 /* ============ boot ============ */
 load();
 loadHist();
+renderNotes();
 if(calY == null){ var _n = new Date(); calY = _n.getFullYear(); calM = _n.getMonth(); selDay = dayKey(Date.now()); }
 render();
 renderHist();
