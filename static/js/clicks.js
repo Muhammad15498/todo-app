@@ -190,6 +190,7 @@
   function paintPdfText(textContent, layer, viewport, pdfjsLib) {
     var Util = pdfjsLib.Util;
     layer.innerHTML = "";
+    layer.style.setProperty("--scale-factor", String(viewport.scale));
     var items = textContent.items || [];
     for (var i = 0; i < items.length; i += 1) {
       var item = items[i];
@@ -202,7 +203,12 @@
       span.style.top = tx[5] - fontHeight + "px";
       span.style.fontSize = fontHeight + "px";
       span.style.fontFamily = "sans-serif";
+      span.style.transformOrigin = "0% 0%";
       layer.appendChild(span);
+      if (item.width && span.offsetWidth) {
+        var sx = (item.width * viewport.scale) / span.offsetWidth;
+        if (sx && isFinite(sx)) span.style.transform = "scaleX(" + sx + ")";
+      }
     }
   }
 
@@ -237,7 +243,7 @@
       canvas.width = Math.floor(viewport.width);
       canvas.height = Math.floor(viewport.height);
       canvas.style.display = "block";
-      canvas.style.width = "100%";
+      canvas.style.width = Math.floor(viewport.width) + "px";
       canvas.style.pointerEvents = "none";
       var layer = document.createElement("div");
       layer.className = "textLayer";
@@ -253,9 +259,25 @@
       var items = (textContent.items || []).filter(function (it) {
         return it.str && String(it.str).trim();
       });
+      layer.style.setProperty("--scale-factor", String(viewport.scale));
       if (items.length) {
         anyText = true;
-        paintPdfText(textContent, layer, viewport, window.pdfjsLib);
+        var painted = false;
+        try {
+          if (typeof window.pdfjsLib.renderTextLayer === "function") {
+            var task = window.pdfjsLib.renderTextLayer({
+              textContentSource: textContent,
+              textContent: textContent,
+              container: layer,
+              viewport: viewport,
+              textDivs: []
+            });
+            if (task && task.promise) await task.promise;
+            else if (task && typeof task.then === "function") await task;
+            painted = !!layer.childElementCount;
+          }
+        } catch (err) {}
+        if (!painted) paintPdfText(textContent, layer, viewport, window.pdfjsLib);
       }
     }
     if (!anyText) {
@@ -527,14 +549,16 @@
       if (typeof on !== "boolean") on = true;
       var set = el("setGemini");
       var groqBox = el("setGroq");
+      var size = el("setSize");
       if (on) {
         try {
           if (set && !set.value) set.value = localStorage.getItem("cw-gemini") || "";
           if (groqBox && !groqBox.value) groqBox.value = localStorage.getItem("cw-groq") || "";
+          if (size && !size.value) size.value = "20";
         } catch (e) {}
+        if (window.cwFillSettings) window.cwFillSettings();
       }
       showModal("settingsModal", on);
-      say(on ? "Settings open" : "Settings closed");
     },
     saveSettings: function () {
       var k = ((el("setGemini") && el("setGemini").value) || "").trim() || key();
@@ -574,6 +598,9 @@
       f.click();
     },
     home: function () {
+      showModal("settingsModal", false);
+      showModal("pasteModal", false);
+      showModal("noteModal", false);
       showView("library");
     },
     vocab: function () {
@@ -607,9 +634,6 @@
                 text: "The committee took the delay into account and, in the end, decided to give up the old plan. Nobody wanted to make a mountain out of a molehill, but the deadline was real.\n\nMaya had carried out the first half of the work in spite of a fever. She did not look up from the page until the numbers began to make sense. We can still figure this out, she said.\n\nHighlight give up, take into account, in spite of, or any single word."
               };
       showText(pack.title, pack.text);
-      if (window.cwOpenDoc) {
-        Promise.resolve(window.cwOpenDoc(pack.id)).catch(function () {});
-      }
       say("Opened a sample. Highlight 1–4 words.");
     },
     onFiles: async function (files) {
@@ -728,14 +752,6 @@
   }
 
   document.addEventListener("click", fromEvent, true);
-  document.addEventListener(
-    "pointerup",
-    function (e) {
-      if (e.pointerType === "mouse" && e.button !== 0) return;
-      fromEvent(e);
-    },
-    true
-  );
 
   function wireFile() {
     var f = el("fileInput");
@@ -759,6 +775,6 @@
       if (el("bannerKey") && gk) el("bannerKey").value = gk;
       if (el("bannerGroq") && rq) el("bannerGroq").value = rq;
     } catch (e) {}
-    say("Context Word · build 14 · sentence first");
+    say("Ready");
   });
 })();

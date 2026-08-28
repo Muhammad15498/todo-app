@@ -173,14 +173,21 @@ function paintPdfText(textContent, layer, viewport, pdfjsLib) {
     span.style.top = `${tx[5] - fontHeight}px`;
     span.style.fontSize = `${fontHeight}px`;
     span.style.fontFamily = "sans-serif";
+    span.style.transformOrigin = "0% 0%";
     const angle = Math.atan2(tx[1], tx[0]);
-    if (angle) span.style.transform = `rotate(${angle}rad)`;
     layer.appendChild(span);
+    const intended = (item.width || 0) * viewport.scale;
+    let transform = angle ? `rotate(${angle}rad)` : "";
+    if (intended && span.offsetWidth) {
+      transform += `${transform ? " " : ""}scaleX(${intended / span.offsetWidth})`;
+    }
+    if (transform) span.style.transform = transform;
   }
 }
 
 async function fillPdfTextLayer(pdfjsLib, textContent, layer, viewport) {
   layer.replaceChildren();
+  layer.style.setProperty("--scale-factor", String(viewport.scale));
   try {
     if (typeof pdfjsLib.renderTextLayer === "function") {
       const task = pdfjsLib.renderTextLayer({
@@ -420,7 +427,7 @@ export class Reader {
     this.pdf = pdf;
     const plain = await extractPdfPlainText(pdf);
     this._plain = plain;
-    if ((plain || "").replace(/\s/g, "").length > 400) {
+    if ((plain || "").replace(/\s/g, "").length > 80) {
       this._pdfMode = "text";
       this.stage.innerHTML = "";
       this.stage.dataset.kind = "txt";

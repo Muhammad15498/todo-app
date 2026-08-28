@@ -29,7 +29,14 @@ const state = {
 
 let reader;
 
+function clampFont(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x) || x < 16) return 20;
+  return Math.min(28, Math.round(x));
+}
+
 function applyTheme() {
+  state.settings.fontSize = clampFont(state.settings.fontSize);
   document.documentElement.dataset.theme = state.settings.theme;
   document.documentElement.style.setProperty("--read-size", `${state.settings.fontSize / 16}rem`);
   const font =
@@ -146,9 +153,9 @@ async function openDoc(id) {
       text: sample.body
     };
   }
-  if ((doc.type === "sample" || doc.builtin) && !String(doc.text || "").trim()) {
+  if (doc.type === "sample" || doc.builtin) {
     const sample = SAMPLES.find((s) => s.id === doc.id);
-    if (sample) doc.text = sample.body;
+    if (sample && sample.body) doc.text = sample.body;
   }
   if (doc.id) {
     doc.lastOpened = Date.now();
@@ -491,7 +498,7 @@ async function saveSettings() {
   state.settings = {
     ...state.settings,
     theme: $("#setTheme").value,
-    fontSize: Number($("#setSize").value),
+    fontSize: clampFont($("#setSize") && $("#setSize").value),
     font: $("#setFont").value,
     lang: $("#setLang").value,
     geminiKey: $("#setGemini").value.trim(),
@@ -575,6 +582,8 @@ function loadLocalSettings() {
     /* ignore */
   }
   state.settings.model = DEFAULTS.model;
+  state.settings.fontSize = clampFont(state.settings.fontSize);
+  persistLocalSettings();
 }
 
 function persistLocalSettings() {
@@ -607,6 +616,7 @@ async function boot() {
   window.cwIngestPaste = ingestPaste;
   window.cwRenderVocab = renderVocab;
   window.cwSaveSettings = saveSettings;
+  window.cwFillSettings = fillSettings;
   window.cwOpenDoc = openDoc;
   window.cwGloss = (info) => gloss(info);
   window.cwTogglePdfMode = () => reader?.togglePdfMode?.();
@@ -643,11 +653,29 @@ async function boot() {
   });
   $("#vocabBack").addEventListener("click", () => showView("library"));
   $("#vocabList").addEventListener("click", async (e) => {
-    const id = e.target.dataset.delWord;
-    if (!id) return;
-    await db.deleteWord(id);
-    await renderVocab();
+    const del = e.target.closest("[data-del-word]");
+    if (del) {
+      e.preventDefault();
+      e.stopPropagation();
+      await db.deleteWord(del.dataset.delWord);
+      await renderVocab();
+      return;
+    }
+    const item = e.target.closest("[data-open-word]");
+    if (!item) return;
+    const w = state.words.find((row) => row.id === item.dataset.openWord);
+    openSavedWord(w);
   });
+  $("#noteClose")?.addEventListener("click", () => showModal("#noteModal", false));
+  $("#noteSpeak")?.addEventListener("click", () => {
+    if (state.noteWord) speak(state.noteWord.word);
+  });
+  $("#noteOpen")?.addEventListener("click", () => {
+    const id = $("#noteOpen")?.dataset.docId;
+    showModal("#noteModal", false);
+    if (id) openDoc(id);
+  });
+  $("#readMode")?.addEventListener("click", () => reader?.togglePdfMode?.());
   $("#vocabExport").addEventListener("click", () => {
     const rows = [["word", "meaning", "sentence", "source"]].concat(
       state.words.map((w) => [w.word, w.meaning, w.context, w.docTitle])
@@ -695,12 +723,6 @@ async function boot() {
   $("#setSave").addEventListener("click", async () => {
     await saveSettings();
     showModal("#settingsModal", false);
-  });
-  $("#pasteModal").addEventListener("click", (e) => {
-    if (e.target.id === "pasteModal") showModal("#pasteModal", false);
-  });
-  $("#settingsModal").addEventListener("click", (e) => {
-    if (e.target.id === "settingsModal") showModal("#settingsModal", false);
   });
 
   $("#panelClose").addEventListener("click", () => closePanel());
