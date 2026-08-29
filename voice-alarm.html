@@ -353,7 +353,8 @@
 
   <!-- TRANSCRIPT & AI RESULT -->
   <div class="card" id="resCard" style="display:none">
-    <div class="lbl">📝 Transcript &amp; AI result — <span id="resEngine" style="font-weight:400"></span></div>
+    <div class="lbl">📝 Transcript &amp; AI result — <span id="resEngine" style="font-weight:400"></span>
+      <button class="x" id="speakChip" style="float:right" title="voice replies on/off">🔊</button></div>
     <div class="dm" id="resTrans" style="white-space:pre-wrap;background:#f6f8fa;border-radius:8px;padding:8px 10px;margin:6px 0"></div>
     <div class="dm" id="resTime" style="color:#0b7285"></div>
     <div class="dm" id="resOrg" style="white-space:pre-wrap;margin-top:6px"></div>
@@ -1063,7 +1064,7 @@ function startRecognition(onInterim, onFinal, onErr){
   return r;
 }
 var IS_MOBILE = /Android|iPhone|iPad|Mobi/i.test(navigator.userAgent || "");
-var APP_VERSION = "v28";
+var APP_VERSION = "v29";
 function micState(cb){
   if(navigator.permissions && navigator.permissions.query){
     navigator.permissions.query({name:"microphone"}).then(function(p){ cb(p.state); }).catch(function(){ cb("unknown"); });
@@ -1905,7 +1906,7 @@ function finalizePipeline(ai, srcTag){
   }
   /* AUTO-PILOT: per-reminder countdowns, zero taps. Explicit trailing فكرني/remind me overrides narration doubts */
   var explicitTail = explicitTailCheck(ai.transcript);
-  var made = 0, firstHow = "";
+  var made = 0, firstHow = "", firstTitle = "", firstPhrase = "", firstDue = 0;
   rems.forEach(function(r){
     var dueAt, auto3s = false, how;
     var w = parseWhen(r.whenText || (r.title + " " + r.bullets.join(" ")), {ignoreNarration: explicitTail});
@@ -1913,10 +1914,15 @@ function finalizePipeline(ai, srcTag){
     else if(w){ dueAt = w.dueAt; how = (explicitTail ? "confirmed by فكرني" : "detected") + (w.phrase ? ": «" + w.phrase + "»" : ""); }
     else { dueAt = Date.now() + 3000; auto3s = true; how = "no time → 3s"; }
     addTask(r.title, r.bullets.join("\n"), dueAt, made === 0 ? currentAudio : null, {auto3s: auto3s, spaced: spacedOn});
-    if(made === 0) firstHow = how + ": alarm in " + fmtDur(dueAt - Date.now());
+    if(made === 0){ firstHow = how + ": alarm in " + fmtDur(dueAt - Date.now());
+      firstTitle = r.title; firstDue = dueAt; firstPhrase = (w && w.phrase) ? w.phrase : ""; }
     made++;
   });
   showResult(ai, srcTag, "⏱ " + firstHow);
+  var arNote = /[\u0600-\u06FF]/.test(ai.transcript || "");
+  var tTxt = firstPhrase || ("after " + fmtDur(Math.max(0, firstDue - Date.now())));
+  confirmSpeak(arNote ? ("تمام، فهمتك. هفكرك: " + firstTitle + "، " + tTxt + ".")
+                      : ("Got it. I'll remind you: " + firstTitle + ", " + tTxt + "."), arNote);
   toast("🚀 Auto-started " + made + " reminder" + (made > 1 ? "s" : "") + " (" + firstHow + ")");
   currentAudio = null; manualDue = null; spacedOn = false;
   $("spacedChip").classList.remove("on");
@@ -2033,7 +2039,54 @@ var NOTESKEY = "voiceAlarm_notes_v1";
 var vnotes = [];
 try{ vnotes = JSON.parse(localStorage.getItem(NOTESKEY) || "[]"); }catch(e){ vnotes = []; }
 var noteSaveCount = 0, lastNote = null;
+$("speakChip").textContent = voiceReplyOn ? "🔊" : "🔇";
+$("speakChip").onclick = function(){
+  voiceReplyOn = !voiceReplyOn;
+  try{ localStorage.setItem("voiceAlarm_voiceReply", voiceReplyOn ? "1" : "0"); }catch(e){}
+  $("speakChip").textContent = voiceReplyOn ? "🔊" : "🔇";
+  toast(voiceReplyOn ? "🔊 Voice replies ON" : "🔇 Voice replies OFF");
+  if(voiceReplyOn) confirmSpeak("Voice replies on.", false);
+};
 var EMPTY_TXT = "(the voice note is empty)";
+var voiceReplyOn = true;
+try{ voiceReplyOn = localStorage.getItem("voiceAlarm_voiceReply") !== "0"; }catch(e){}
+async function confirmSpeak(text, langAr){
+  if(!voiceReplyOn || !text) return;
+  text = String(text).slice(0, 280);
+  if(groqKey){
+    /* humanlike Orpheus TTS on the same free gsk_ key */
+    try{
+      var resp = await withTimeout(fetch("https://api.groq.com/openai/v1/audio/speech", {
+        method: "POST",
+        headers: { "Authorization": "Bearer " + groqKey, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: langAr ? "canopylabs/orpheus-arabic-saudi" : "canopylabs/orpheus-v1-english",
+          voice: langAr ? "Abdullah" : "hannah",
+          input: text, response_format: "mp3"
+        })
+      }), 30000, "tts:timeout");
+      if(resp.ok){
+        var ab = await resp.arrayBuffer();
+        var a = new Audio(URL.createObjectURL(new Blob([ab], { type: "audio/mpeg" })));
+        a.play();
+        return;
+      }
+    }catch(e){}
+  }
+  /* free local system voice - instant, offline, decent */
+  try{
+    if(!window.speechSynthesis) return;
+    var u = new SpeechSynthesisUtterance(text);
+    var vs = speechSynthesis.getVoices() || [], pick = null;
+    for(var i = 0; i < vs.length; i++){
+      var vl = String(vs[i].lang || "");
+      if(langAr ? vl.indexOf("ar") === 0 : vl.indexOf("en") === 0){ if(!pick || vs[i].localService) pick = vs[i]; }
+    }
+    if(pick) u.voice = pick;
+    u.lang = langAr ? "ar-EG" : "en-US";
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
 function showResult(ai, srcTag, howText){
   var rc = $("resCard"); if(!rc) return;
   rc.style.display = "block";
@@ -2050,6 +2103,7 @@ function setEmptyTranscript(){
   }
   $("interim").textContent = "Transcript: " + EMPTY_TXT;
   showResult({ transcript: EMPTY_TXT, reminders: [] }, "silence check", "no sound in the audio → no alarm armed");
+  confirmSpeak(EMPTY_TXT, false);
   toast("📝 " + EMPTY_TXT);
 }
 function blobSilent(blob, cb){
