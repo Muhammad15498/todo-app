@@ -351,6 +351,14 @@
     <div id="list"></div>
   </div>
 
+  <!-- TRANSCRIPT & AI RESULT -->
+  <div class="card" id="resCard" style="display:none">
+    <div class="lbl">📝 Transcript &amp; AI result — <span id="resEngine" style="font-weight:400"></span></div>
+    <div class="dm" id="resTrans" style="white-space:pre-wrap;background:#f6f8fa;border-radius:8px;padding:8px 10px;margin:6px 0"></div>
+    <div class="dm" id="resTime" style="color:#0b7285"></div>
+    <div class="dm" id="resOrg" style="white-space:pre-wrap;margin-top:6px"></div>
+  </div>
+
   <!-- VOICE NOTES LIBRARY -->
   <div class="card">
     <div class="lbl">🎙 Voice notes — saved on this device</div>
@@ -492,13 +500,14 @@ var TYPO_EN = [
 ];
 var TYPO_AR = [
   [/شويه/g, "شوية"], [/كده/g, "كدا"], [/ثوانيه/g, "ثواني"], [/دقيقي/g, "دقيقة"],
-  [/اثنين/g, "اتنين"], [/ثلاثة/g, "تلاتة"], [/أربعة|اربعه/g, "اربعة"],
+  [/اثنين/g, "اتنين"], [/ثلاثة/g, "تلاتة"], [/ثلاث(?![ا-ي])/g, "تلات"], [/أربعة|اربعه/g, "اربعة"],
+  [/ثلاثة عشر|تلاتاشر|تلتاشر/g, "تلتاشر"],
   [/خمسه|خماية/g, "خمسة"], [/سته/g, "ستة"], [/سبعه/g, "سبعة"],
   [/ثمانية|تمنية/g, "تمانية"], [/تسعه/g, "تسعة"], [/عشره/g, "عشرة"],
   [/مساء/g, "مسا"], [/دقائق/g, "دقايق"]
 ];
 function prepText(raw){
-  var s = normalizeDigits(raw);
+  var s = normalizeDigits(raw).replace(/[\u064B-\u0652\u0670]/g, "");
   TYPO_AR.forEach(function(p){ s = s.replace(p[0], p[1]); });
   TYPO_EN.forEach(function(p){ s = s.replace(p[0], p[1]); });
   s = s.replace(/[أإآ]/g, "ا").replace(/ى/g, "ي");
@@ -508,11 +517,13 @@ function prepText(raw){
 var ARNUM = {
   "اتنين":2, "تلات":3, "تلاتة":3, "تلاتاية":3, "اربع":4, "اربعة":4,
   "خمس":5, "خمسة":5, "خمساية":5, "ست":6, "ستة":6, "سبع":7, "سبعة":7,
-  "تمنية":8, "تمانية":8, "تسع":9, "تسعة":9, "عشر":10, "عشرة":10, "عشراية":10
+  "تمنية":8, "تمانية":8, "تسع":9, "تسعة":9, "عشر":10, "عشرة":10, "عشراية":10,
+  "حداشر":11, "اتناشر":12, "تلتاشر":13, "عشرين":20, "تلاتين":30, "اربعين":40,
+  "خمسين":50, "ستين":60, "تسعين":90, "مية":100, "ميتين":200
 };
-var ARUNIT = { "ثانية":1000, "ثواني":1000, "دقيقة":60000, "دقايق":60000, "ساعة":3600000, "ساعات":3600000 };
-var NUMW = "(اتنين|تلاتة|تلاتاية|تلات|اربعة|اربع|خمسة|خمساية|خمس|ستة|ست|سبعة|سبع|تمنية|تمانية|تسعة|تسع|عشرة|عشراية|عشر)";
-var UNITW = "(ثانية|ثواني|دقيقة|دقايق|ساعة|ساعات)";
+var ARUNIT = { "ثانية":1000, "ثواني":1000, "ثوان":1000, "دقيقة":60000, "دقايق":60000, "ساعة":3600000, "ساعات":3600000, "يوم":86400000, "ايام":86400000 };
+var NUMW = "(تلاتاية|خمساية|عشراية|تلتاشر|اتناشر|حداشر|تلاتة|اربعة|خمسة|تمانية|تسعة|عشرة|تمنية|عشرين|تلاتين|اربعين|خمسين|ستين|تسعين|ميتين|تلات|ثلاث|اربع|خمس|ستة|سبعة|سبع|تسع|عشر|مية|ست|اتنين)";
+var UNITW = "(ثانية|ثواني|ثوان|دقيقة|دقايق|ساعة|ساعات|يوم|ايام)";
 function arNumMs(numWord, unitWord){
   var n = ARNUM[numWord]; if(!n) return null;
   var u = unitWord ? ARUNIT[unitWord] : 60000;   /* no unit said? minutes is the intent */
@@ -544,7 +555,7 @@ function parseWhen(raw, opts){
     var ms2 = /^d/.test(u2) ? parseInt(m[1],10)*86400000 : unitToMs(parseInt(m[1],10), m[2]);
     if(ms2 && narratedOK(src, m[0], opts)) return {dueAt: Date.now()+ms2, phrase:m[0]};
   }
-  m = s.match(/(\d+)\s*(ثانية|ثواني|ثوانٍ|ثوان|دقيقة|دقائق|ساعة|ساعات)/);
+  m = s.match(/(\d+)\s*(ثانية|ثواني|ثوانٍ|ثوان|دقيقة|دقائق|ساعة|ساعات|يوم|ايام)/);
   if(m){ var ms3 = unitToMs(parseInt(m[1],10), m[2]); if(ms3 && narratedOK(src, m[0], opts)) return {dueAt: Date.now()+ms3, phrase:m[0]}; }
   var src = p;
   /* Egyptian dialect numbers: "كمان خمساية", "كمان خمسة" -> 5 min */
@@ -1052,7 +1063,7 @@ function startRecognition(onInterim, onFinal, onErr){
   return r;
 }
 var IS_MOBILE = /Android|iPhone|iPad|Mobi/i.test(navigator.userAgent || "");
-var APP_VERSION = "v27";
+var APP_VERSION = "v28";
 function micState(cb){
   if(navigator.permissions && navigator.permissions.query){
     navigator.permissions.query({name:"microphone"}).then(function(p){ cb(p.state); }).catch(function(){ cb("unknown"); });
@@ -1887,6 +1898,7 @@ function finalizePipeline(ai, srcTag){
   $("interim").innerHTML = "<span class='got'>" + esc(ai.transcript.slice(0, 140)) + (ai.transcript.length > 140 ? "…" : "") + "</span>";
   updateTimeStatus();
   if(!autoOn){
+    showResult(ai, srcTag, "manual mode — review, then press Start");
     $("orgCard").scrollIntoView({behavior:"smooth", block:"nearest"});
     setTimeout(aiCardHideIfDone, 8000);
     return;   /* manual mode: user reviews and presses Start */
@@ -1897,13 +1909,14 @@ function finalizePipeline(ai, srcTag){
   rems.forEach(function(r){
     var dueAt, auto3s = false, how;
     var w = parseWhen(r.whenText || (r.title + " " + r.bullets.join(" ")), {ignoreNarration: explicitTail});
-    if(r.delay != null){ dueAt = Date.now() + r.delay * 1000; how = "AI time"; }
-    else if(w){ dueAt = w.dueAt; how = explicitTail ? "confirmed by فكرني" : "detected in text"; }
+    if(r.delay != null){ dueAt = Date.now() + r.delay * 1000; how = "AI time" + (r.quoted ? " (quoted → default)" : ""); }
+    else if(w){ dueAt = w.dueAt; how = (explicitTail ? "confirmed by فكرني" : "detected") + (w.phrase ? ": «" + w.phrase + "»" : ""); }
     else { dueAt = Date.now() + 3000; auto3s = true; how = "no time → 3s"; }
     addTask(r.title, r.bullets.join("\n"), dueAt, made === 0 ? currentAudio : null, {auto3s: auto3s, spaced: spacedOn});
     if(made === 0) firstHow = how + ": alarm in " + fmtDur(dueAt - Date.now());
     made++;
   });
+  showResult(ai, srcTag, "⏱ " + firstHow);
   toast("🚀 Auto-started " + made + " reminder" + (made > 1 ? "s" : "") + " (" + firstHow + ")");
   currentAudio = null; manualDue = null; spacedOn = false;
   $("spacedChip").classList.remove("on");
@@ -2021,12 +2034,22 @@ var vnotes = [];
 try{ vnotes = JSON.parse(localStorage.getItem(NOTESKEY) || "[]"); }catch(e){ vnotes = []; }
 var noteSaveCount = 0, lastNote = null;
 var EMPTY_TXT = "(the voice note is empty)";
+function showResult(ai, srcTag, howText){
+  var rc = $("resCard"); if(!rc) return;
+  rc.style.display = "block";
+  $("resEngine").textContent = SRC_LABEL[srcTag] || srcTag || "—";
+  $("resTrans").textContent = (ai && ai.transcript) || EMPTY_TXT;
+  $("resTime").textContent = howText || "";
+  var r0 = ai && ai.reminders && ai.reminders[0];
+  $("resOrg").textContent = r0 ? ("▸ " + r0.title + ((r0.bullets && r0.bullets.length) ? "\n" + r0.bullets.map(function(b){ return "• " + b; }).join("\n") : "")) : "";
+}
 function setEmptyTranscript(){
   if(lastNote){ lastNote.transcript = EMPTY_TXT;
     try{ localStorage.setItem(NOTESKEY, JSON.stringify(vnotes)); }catch(e){}
     renderNotes();
   }
   $("interim").textContent = "Transcript: " + EMPTY_TXT;
+  showResult({ transcript: EMPTY_TXT, reminders: [] }, "silence check", "no sound in the audio → no alarm armed");
   toast("📝 " + EMPTY_TXT);
 }
 function blobSilent(blob, cb){
@@ -2047,7 +2070,7 @@ async function groqAnalyzeText(text){
     method: "POST",
     headers: { "Authorization": "Bearer " + groqKey, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "llama-3.1-8b-instant",
+      model: agentsDeep ? "llama-3.3-70b-versatile" : "llama-3.1-8b-instant",
       temperature: 0,
       response_format: { type: "json_object" },
       messages: [
