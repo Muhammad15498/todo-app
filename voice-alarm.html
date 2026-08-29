@@ -1,0 +1,2421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#f6f7fb">
+<meta name="color-scheme" content="light">
+<title>Voice Alarm</title>
+<style>
+  :root{
+    --bg:#f6f7fb; --card:#ffffff; --card2:#f2f4fa; --line:#e5e8f2; --line2:#d5d9e8;
+    --text:#1b2140; --dim:#6d7595; --acc:#6c5ce7; --accB:#4a90ff;
+    --warn:#c77700; --danger:#e6294b; --rec:#ff4757; --ok:#1da65a;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    font-family:'Segoe UI', system-ui, Tahoma, Arial, sans-serif;
+    background:
+      radial-gradient(800px 400px at 10% -10%, rgba(108,92,231,.10), transparent 60%),
+      radial-gradient(700px 400px at 100% -10%, rgba(74,144,255,.10), transparent 55%),
+      var(--bg);
+    color:var(--text); min-height:100vh; padding:16px;
+  }
+  .wrap{max-width:1200px; margin:0 auto; display:grid; grid-template-columns:minmax(0,1fr) 340px; gap:16px; align-items:start;}
+  .maincol{min-width:0;}
+  .side{position:sticky; top:16px;}
+  @media(max-width:980px){
+    .wrap{display:block; max-width:780px;}
+    .side{position:static; margin-top:0;}
+  }
+  header{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:4px; flex-wrap:wrap;}
+  h1{
+    font-size:1.45rem; display:flex; align-items:center; gap:10px;
+    background:linear-gradient(90deg,#6c5ce7,#4a90ff);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .sub{font-size:.84rem; color:var(--dim); margin-bottom:16px;}
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:18px; padding:18px;
+    margin-bottom:16px; box-shadow:0 6px 24px rgba(27,33,64,.06);
+  }
+  .lbl{font-size:.72rem; color:var(--dim); margin-bottom:10px; letter-spacing:.8px; text-transform:uppercase; font-weight:700;}
+  .row{display:flex; gap:8px; flex-wrap:wrap; align-items:center;}
+  /* record */
+  #recBtn{
+    width:92px; height:92px; border-radius:50%; border:none; cursor:pointer;
+    background:radial-gradient(circle at 32% 28%,#ff8a97,var(--rec));
+    box-shadow:0 10px 26px rgba(255,71,87,.30), inset 0 -3px 8px rgba(0,0,0,.12);
+    color:#fff; font-size:.8rem; font-weight:700;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+    transition:transform .12s;
+  }
+  #recBtn:hover{transform:scale(1.04);}
+  #recBtn:active{transform:scale(.95);}
+  #recBtn.rec{animation:pulse 1.1s infinite; background:radial-gradient(circle at 32% 28%,#ffb26b,#e84118);}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(232,65,24,.45);}70%{box-shadow:0 0 0 22px rgba(232,65,24,0);}100%{box-shadow:0 0 0 0 rgba(232,65,24,0);}}
+  .micIco{font-size:28px;}
+  #recTime{font-variant-numeric:tabular-nums;}
+  .recbox{display:flex; gap:16px; align-items:center;}
+  .livebox{flex:1; min-width:180px;}
+  #interim{min-height:44px; font-size:.95rem; color:var(--dim); font-style:italic; line-height:1.5;}
+  #interim .got{color:var(--text); font-style:normal;}
+  .hint{font-size:.78rem; color:var(--dim); margin-top:6px; line-height:1.6;}
+  #lvlWrap{display:none; gap:3px; height:24px; align-items:flex-end; margin-top:8px;}
+  #lvlWrap.listening .lv{animation: lvlpulse .8s ease-in-out infinite;}
+  #lvlWrap.listening .lv:nth-child(2){animation-delay:.08s}
+  #lvlWrap.listening .lv:nth-child(3){animation-delay:.16s}
+  #lvlWrap.listening .lv:nth-child(4){animation-delay:.24s}
+  #lvlWrap.listening .lv:nth-child(5){animation-delay:.32s}
+  #lvlWrap.listening .lv:nth-child(6){animation-delay:.4s}
+  #lvlWrap.listening .lv:nth-child(7){animation-delay:.48s}
+  @keyframes lvlpulse{0%,100%{height:18%}50%{height:92%}}
+  .lv{width:5px; border-radius:3px; background:linear-gradient(180deg,#ff8a97,#e84118); height:15%; transition:height .09s ease-out;}
+  textarea{
+    width:100%; background:#fbfcfe; color:var(--text); border:1px solid var(--line2);
+    border-radius:12px; padding:12px 14px; font-size:1rem; font-family:inherit; resize:vertical; min-height:78px;
+  }
+  textarea:focus{outline:none; border-color:var(--acc); box-shadow:0 0 0 3px rgba(108,92,231,.14);}
+  input[type=text]{
+    width:100%; background:#fbfcfe; color:var(--text); border:1px solid var(--line2);
+    border-radius:12px; padding:11px 14px; font-size:1.02rem; font-weight:600; font-family:inherit;
+  }
+  input[type=text]:focus{outline:none; border-color:var(--acc); box-shadow:0 0 0 3px rgba(108,92,231,.14);}
+  .chip{
+    display:inline-flex; align-items:center; gap:6px; background:var(--card2); border:1px solid var(--line);
+    border-radius:99px; padding:7px 13px; font-size:.85rem; color:var(--dim); cursor:pointer; user-select:none;
+    transition:border-color .15s, color .15s, transform .1s;
+  }
+  .chip:hover{border-color:var(--acc); color:var(--text);}
+  .chip:active{transform:scale(.97);}
+  .chip.on{background:linear-gradient(135deg,var(--acc),var(--accB)); color:#fff; border-color:transparent;}
+  .btn{
+    background:linear-gradient(135deg,var(--acc),var(--accB)); color:#fff; border:none; border-radius:13px;
+    padding:12px 18px; font-size:.95rem; font-weight:600; cursor:pointer;
+    box-shadow:0 8px 20px rgba(108,92,231,.25);
+  }
+  .btn:hover{filter:brightness(1.06);}
+  .btn.big{width:100%; font-size:1.06rem; padding:15px; margin-top:16px;}
+  .att{
+    display:none; align-items:center; gap:10px; background:var(--card2); border:1px dashed var(--line2);
+    border-radius:13px; padding:8px 12px; margin-top:12px; font-size:.85rem; color:var(--dim);
+  }
+  .att.show{display:flex;}
+  .att audio{height:34px;}
+  .att button{background:none;border:none;color:var(--danger);cursor:pointer;font-size:1rem;}
+  /* AI status card */
+  #aiCard{border:1px solid var(--line2); border-radius:14px; padding:11px 13px; background:#fbfcfe; margin-top:12px;}
+  #aiCard.aierr{border-color:var(--danger); background:#fff5f7;}
+  #aiCard.aiok{border-color:rgba(29,166,90,.5); background:#f2fcf6;}
+  #aiStage{font-size:.92rem; font-weight:700;}
+  #aiSub{font-size:.78rem; color:var(--dim); margin-top:4px; line-height:1.6; white-space:pre-wrap;}
+  #aiCard .bar{margin-top:8px;}
+  /* organized card */
+  #orgCard{display:none; border:1px solid rgba(108,92,231,.35);}
+  #orgCard.show{display:block;}
+  .orgHead{display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;}
+  .orgHead .lbl{margin:0; color:var(--acc);}
+  /* tasks */
+  .task{
+    background:var(--card); border:1px solid var(--line); border-left:4px solid var(--acc); border-radius:14px;
+    padding:15px; margin-bottom:12px; box-shadow:0 4px 16px rgba(27,33,64,.05); transition:transform .12s;
+  }
+  .task:hover{transform:translateY(-1px);}
+  .task.overdue{border-left-color:var(--warn);}
+  .task .t{font-weight:700; font-size:1.05rem; margin-bottom:3px;}
+  .task .n{font-size:.86rem; color:var(--dim); margin-bottom:8px; white-space:pre-wrap;}
+  .task .cd{
+    font-size:clamp(1.7rem, 5vw, 2.3rem); font-weight:800; font-variant-numeric:tabular-nums;
+    direction:ltr; unicode-bidi:embed;
+    background:linear-gradient(90deg,#6c5ce7,#4a90ff);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .task .due{font-size:.78rem; color:var(--dim); margin-top:2px;}
+  .bar{height:6px; background:var(--card2); border-radius:99px; overflow:hidden; margin:10px 0 6px; direction:ltr;}
+  .bar i{display:block; height:100%; background:linear-gradient(90deg,var(--acc),var(--accB)); border-radius:99px; transition:width .4s linear;}
+  .task .foot{display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;}
+  .task audio{height:32px; max-width:220px;}
+  .x{background:none; border:1px solid var(--line); color:var(--dim); border-radius:10px; padding:6px 12px; cursor:pointer; font-size:.85rem;}
+  .x:hover{color:var(--danger); border-color:var(--danger);}
+  .empty{color:var(--dim); text-align:center; padding:26px; font-size:.95rem;}
+  .tstat{font-size:.82rem; color:var(--dim); margin-top:8px; min-height:18px;}
+  .tstat.on{color:var(--warn);}
+  .tstat.def{color:var(--acc);}
+  .badge{
+    display:inline-block; font-size:.72rem; background:var(--card2); border:1px solid var(--line);
+    border-radius:99px; padding:2px 9px; margin-left:8px; vertical-align:middle; color:var(--dim);
+  }
+  /* calendar */
+  .calWeek{display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin:12px 0 4px;}
+  .calWeek span{text-align:center; font-size:.68rem; color:var(--dim); font-weight:700; letter-spacing:.5px;}
+  .calGrid{display:grid; grid-template-columns:repeat(7,1fr); gap:4px;}
+  .calDay{
+    aspect-ratio:1; border:1px solid var(--line); border-radius:10px; background:#fbfcfe;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;
+    font-size:.82rem; cursor:pointer; color:var(--text); transition:border-color .12s;
+  }
+  .calDay:hover{border-color:var(--acc);}
+  .calDay.blank{border:none; background:none; cursor:default;}
+  .calDay.today{border-color:var(--acc); box-shadow:0 0 0 2px rgba(108,92,231,.16);}
+  .calDay.sel{background:linear-gradient(135deg,var(--acc),var(--accB)); color:#fff; border-color:transparent;}
+  .calDots{display:flex; gap:3px; height:6px; align-items:center;}
+  .calDotA{width:6px; height:6px; border-radius:50%; background:var(--acc);}
+  .calDotH{width:6px; height:6px; border-radius:50%; background:#a8afc9;}
+  .calDay.sel .calDotA{background:#fff;}
+  #dayList{margin-top:14px;}
+  .dayItem{border:1px solid var(--line); border-radius:12px; padding:10px 13px; margin-bottom:8px; background:#fbfcfe;}
+  .dayItem .dt{font-weight:700; font-size:.95rem;}
+  .dayItem .dm{font-size:.74rem; color:var(--dim); margin-top:2px;}
+  .dayItem .dn{font-size:.82rem; color:var(--dim); white-space:pre-wrap; margin-top:4px;}
+  /* history */
+  .hist{
+    background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px;
+    margin-bottom:12px; box-shadow:0 4px 16px rgba(27,33,64,.05);
+  }
+  .hist .t{font-weight:700; font-size:1rem; margin-bottom:3px;}
+  .hist .n{font-size:.84rem; color:var(--dim); margin:6px 0 10px; white-space:pre-wrap;}
+  .hist .meta{font-size:.72rem; color:var(--dim);}
+  .rearm{display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-top:8px;}
+  .rearm input{
+    width:54px; background:#fbfcfe; border:1px solid var(--line2); border-radius:10px;
+    padding:7px 4px; font-size:.95rem; text-align:center; color:var(--text); font-weight:600;
+  }
+  .rearm input:focus{outline:none; border-color:var(--acc);}
+  .rearm .u{font-size:.72rem; color:var(--dim); margin-right:4px;}
+
+  /* overlay */
+  #overlay{
+    display:none; position:fixed; inset:0; z-index:99; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; padding:24px; animation:flash 1s ease-in-out infinite;
+  }
+  #overlay.show{display:flex;}
+  @keyframes flash{0%,100%{background:#c31432;}50%{background:#7a0c20;}}
+  #ovWrapIcon{position:relative; width:120px; height:120px; margin-bottom:6px;}
+  #ovIcon{font-size:64px; position:relative; z-index:2; animation:shake .35s infinite; display:block; line-height:120px;}
+  @keyframes shake{0%,100%{transform:rotate(-9deg);}50%{transform:rotate(9deg);}}
+  .halo{position:absolute; inset:0; border-radius:50%; border:3px solid rgba(255,255,255,.75); animation:halo 1.4s ease-out infinite;}
+  .halo.h2{animation-delay:.45s;}
+  @keyframes halo{0%{transform:scale(.55); opacity:.9;}100%{transform:scale(1.5); opacity:0;}}
+  #ovTitle{font-size:1.08rem; font-weight:600; color:#fff; text-shadow:0 2px 10px rgba(0,0,0,.5); margin:8px 0 6px; max-width:680px; line-height:1.55;}
+  #ovNotes{font-size:1.08rem; font-weight:400; color:#ffecec; max-width:620px; white-space:pre-wrap; margin-bottom:10px; line-height:1.55;}
+  #ovNotes div{margin:5px 0;}
+  #ovRing{font-size:1rem; color:#ffdcdc; margin-bottom:14px;}
+  #overlay audio{margin-bottom:20px;}
+  #overlay .row{justify-content:center;}
+  #overlay .btn{font-size:1.05rem; padding:16px 26px; border-radius:16px;}
+  #ovSnooze{background:#fff; color:#a3121f; box-shadow:0 8px 24px rgba(0,0,0,.35);}
+  #ovNext{background:#ffd21f; color:#5a3b00; box-shadow:0 8px 24px rgba(0,0,0,.35);}
+  #ovDismiss{background:rgba(20,4,6,.85); color:#fff; border:2px solid #fff;}
+  details{margin-top:6px;}
+  summary{cursor:pointer; color:var(--dim); font-size:.85rem;}
+  details p{font-size:.82rem; color:var(--dim); margin-top:10px; line-height:1.8;}
+  .toast{
+    position:fixed; bottom:18px; left:50%; transform:translateX(-50%); background:#232a4d; color:#fff;
+    padding:11px 20px; border-radius:99px; font-size:.9rem; z-index:120; display:none;
+    box-shadow:0 10px 30px rgba(0,0,0,.25);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>⏱ Voice Alarm <span class="badge" id="verBadge">v?</span></h1>
+  </header>
+  <div class="sub">voice → transcript → organized bullet points → loud alarm · free, runs locally</div>
+
+  <div class="maincol">
+
+  <!-- NEW REMINDER -->
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+        <div class="lbl" style="margin:0">1 · Talk or upload</div>
+        <button class="chip on" id="autoChip">🚀 Auto-pilot: ON</button>
+      </div>
+
+    <div class="recbox">
+      <button id="recBtn"><span class="micIco">🎤</span><span id="recLbl">Record</span><span id="recTime">0:00</span></button>
+      <div class="livebox">
+        <div id="interim">Press the mic and speak — or upload a voice note. Audio is always saved.</div>
+        <div id="lvlWrap"><span class="lv"></span><span class="lv"></span><span class="lv"></span><span class="lv"></span><span class="lv"></span><span class="lv"></span><span class="lv"></span></div>
+        <div class="hint">
+          Time can be exact (“in 20 minutes”, “at 6pm”, «بعد ١٠ دقائق») or fuzzy (“in a bit”, “half an hour”, «بعد شوية», «نص ساعة»).
+          No time at all → alarm fires in 3 seconds with your organized notes.
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:12px" class="row">
+      <label class="chip">📎 Upload voice note
+        <input type="file" id="fileIn" accept="audio/*,.ogg,.opus,.m4a,.mp3,.wav,.webm" hidden>
+      </label>
+      <button class="chip" id="transChip" style="display:none">🤖 Transcribe again</button>
+      <button class="chip" id="playTryChip" style="display:none">🗣 Play-aloud fallback</button>
+      <button class="chip" id="testChip">⚡ Test alarm (3s)</button>
+      <button class="chip" id="diagChip">🩺 Diagnostics</button>
+      <button class="chip" id="speechTestChip">🧪 Speech test</button>
+      <button class="chip" id="kbMicChip">⌨️ Keyboard mic</button>
+    </div>
+
+    <div class="att" id="attBox">
+      <span id="attLbl">🔊</span>
+      <audio id="attAudio" controls></audio>
+      <button id="attClear" title="remove">✖</button>
+    </div>
+
+    <div id="aiCard" style="display:none">
+      <div class="row" style="justify-content:space-between">
+        <div id="aiStage"></div>
+        <button class="chip" id="aiRetry" style="display:none">↻ Retry</button>
+      </div>
+      <div class="bar"><i id="aiBarI" style="width:0"></i></div>
+      <div id="aiSub"></div>
+    </div>
+
+    <div class="row" style="margin-top:14px">
+      <span class="lbl" style="margin:0">AI ENGINE</span>
+      <button class="chip engine" data-engine="groq">🌐 Groq — FREE, mixed AR/EN ⭐</button>
+      <button class="chip engine" data-engine="gemini">🌐 Gemini — smart notes</button>
+      <button class="chip engine" data-engine="local">💻 Local — offline</button>
+      <button class="chip" id="agentsChip">🤝 Agents: FAST</button>
+    </div>
+    <div id="keyRow" style="display:none; margin-top:8px">
+      <div class="row">
+        <input type="password" id="geminiKey" placeholder="Paste your free Gemini API key" style="flex:1; min-width:220px; background:#fbfcfe;border:1px solid var(--line2);color:var(--text);border-radius:12px;padding:9px 12px;font-size:.9rem">
+        <button class="chip" id="keySave">💾 Save key</button>
+        <button class="chip" id="keyEye">👁</button>
+      </div>
+      <div class="hint">Free key, 2 clicks, no credit card: <b>aistudio.google.com/apikey</b> (sign in with Google → Create API key). Stored only on this device.</div>
+    </div>
+    <div class="row" id="modelRow" style="margin-top:10px">
+      <span class="lbl" style="margin:0">LOCAL MODEL</span>
+      <button class="chip model" data-model="small">⭐ Small — best</button>
+      <button class="chip model" data-model="base">🔸 Base — medium</button>
+      <button class="chip model" data-model="tiny">⚡ Tiny — fastest</button>
+    </div>
+    <div class="hint" id="modelHint" style="margin-top:6px">Small ≈ 250 MB · Base ≈ 75 MB · Tiny ≈ 40 MB — downloaded once, then cached. Local runs on your CPU (slow but private &amp; offline). Cloud finishes everything in seconds.</div>
+
+    <div class="row" id="vlangRow" style="margin-top:10px">
+      <span class="lbl" style="margin:0">🎙 SPEECH LANGUAGE (for recording):</span>
+      <button class="chip vlang on" data-vlang="auto">🌐 Auto-detect</button>
+      <button class="chip vlang" data-vlang="en">English</button>
+      <button class="chip vlang" data-vlang="ar">العربية</button>
+    </div>
+
+    <div style="margin-top:14px">
+      <div class="lbl">2 · Transcript</div>
+      <textarea id="taskText" dir="auto" placeholder="What do you need to do? (auto-filled from voice, or type / paste it)"></textarea>
+      <div id="timeStatus" class="tstat"></div>
+    </div>
+  </div>
+
+  <!-- ORGANIZED -->
+  <div class="card" id="orgCard">
+    <div class="orgHead">
+      <div class="row" style="gap:8px">
+        <div class="lbl" style="margin:0">3 · Organized</div>
+        <span class="badge" id="orgBadge">—</span>
+      </div>
+      <button class="chip" id="orgRedo">↻ Re-analyze</button>
+    </div>
+    <input type="text" id="orgTitle" dir="auto" placeholder="Title">
+    <div style="height:10px"></div>
+    <textarea id="orgBullets" dir="auto" style="min-height:96px" placeholder="Bullet points — one per line"></textarea>
+    <div class="hint">First sentence became the title, the rest became bullets. Edit anything freely.</div>
+  </div>
+
+  <!-- OPTIONS + START -->
+  <div class="card">
+    <div class="lbl">4 · When & how it rings</div>
+    <div class="row">
+      <button class="chip q" data-min="1">+1m</button>
+      <button class="chip q" data-min="5">+5m</button>
+      <button class="chip q" data-min="30">+30m</button>
+      <button class="chip q" data-min="60">+1h</button>
+      <input type="datetime-local" id="customTime" style="background:#fbfcfe;border:1px solid var(--line2);color:var(--dim);border-radius:99px;padding:7px 12px;font-size:.85rem">
+      <button class="chip" id="spacedChip">🔁 Spaced repeat</button>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <span class="lbl" style="margin:0">RINGTONE</span>
+      <button class="chip tone" data-tone="classic">🔔 Classic beeps</button>
+      <button class="chip tone" data-tone="chime">🎵 Chime</button>
+      <button class="chip tone" data-tone="gentle">🌙 Gentle</button>
+      <button class="chip tone" data-tone="siren">🚨 Siren</button>
+    </div>
+    <button class="btn big" id="addBtn">▶ Start countdown</button>
+  </div>
+
+  <!-- ACTIVE -->
+  <div class="card">
+    <div class="lbl">Active countdowns</div>
+    <div id="list"></div>
+  </div>
+
+  <!-- VOICE NOTES LIBRARY -->
+  <div class="card">
+    <div class="lbl">🎙 Voice notes — saved on this device</div>
+    <div id="notesList"></div>
+  </div>
+
+  <!-- HISTORY -->
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+      <div class="lbl" style="margin:0">🗂 History — dismissed alarms stay here</div>
+      <button class="chip" id="histClear">🗑 Clear all</button>
+    </div>
+    <div class="hint" style="margin:6px 0 10px">Every finished alarm keeps its points and audio. Set hours / minutes / seconds and press ▶ to ring it again.</div>
+    <div id="histList"></div>
+  </div>
+
+  <details>
+    <summary>How it works / limits</summary>
+    <p>
+      • <b>Auto-pilot (ON by default):</b> record or upload → transcribe → AI-organized title + bullets → countdown starts by itself — no time mentioned means alarm in 3 seconds. One tap on the 🚀 chip switches to manual review.<br>
+      • <b>Cloud engine (recommended):</b> paste a free Gemini API key (aistudio.google.com/apikey — 2 clicks, no card) and everything happens in one ~2-5 second call: transcription, cleanup, organizing, and time extraction. Excellent with Arabic &amp; mixed audio. <b>Local engine:</b> Whisper inside your browser — private and offline, but CPU-slow. Cloud failures auto-fall back to Local.<br>
+      • <b>⭐ Small model</b> is the quality pick for Arabic / mixed Arabic-English audio (≈250 MB, downloaded once, then cached & offline). Auto-detect lets Whisper pick the language per recording; force English or Arabic if detection guesses wrong.<br>
+      • After transcription the app <b>auto-analyzes</b>: first sentence → title, the rest → bullet points (fillers removed, duplicates merged). Everything stays editable.<br>
+      • Fuzzy times understood: “a couple of minutes” = 2m, “a few minutes” = 3m, “some minutes” = 10m, “in a bit / soon” = 5m, “later” = 1h, “half an hour” = 30m, «بعد شوية» = 5m, «نص ساعة» = 30m, «كم دقيقة» = 10m, «ثواني» = 10s.<br>
+      • No time mentioned → alarm after <b>3 seconds</b> showing your organized notes. Snooze = 5 seconds (testing mode).<br>
+      • 🔁 Spaced repeat: on ring, “Next” re-queues at 5m → 30m → 2h → 1d → 3d.<br>
+      • Ringtones start soft and escalate. The alarm needs this tab to stay open. Everything is stored locally in your browser.
+    </p>
+  </details>
+  </div><!-- /maincol -->
+
+  <aside class="side">
+  <!-- CALENDAR -->
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+      <div class="lbl" style="margin:0">📅 Calendar — your notes on their days</div>
+      <div class="row">
+        <button class="chip" id="calPrev">‹</button>
+        <button class="chip" id="calTitle" style="min-width:140px;justify-content:center">—</button>
+        <button class="chip" id="calNext">›</button>
+      </div>
+    </div>
+    <div class="calWeek"><span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span></div>
+    <div class="calGrid" id="calGrid"></div>
+    <div id="dayList"></div>
+  </div>
+  </aside>
+</div>
+
+<!-- RING OVERLAY -->
+<div id="overlay">
+  <div id="ovWrapIcon"><span class="halo"></span><span class="halo h2"></span><span id="ovIcon">⏰</span></div>
+  <div id="ovTitle" dir="auto"></div>
+  <div id="ovNotes"></div>
+  <div id="ovRing"></div>
+  <audio id="ovAudio" controls></audio>
+  <div class="row">
+    <button class="btn" id="ovSnooze">😴 Snooze 5s</button>
+    <button class="btn" id="ovNext" style="display:none">🔁 <span id="ovNextLbl"></span></button>
+    <button class="btn" id="ovDismiss">✅ Dismiss</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* ============ helpers ============ */
+function $(id){ return document.getElementById(id); }
+function toast(msg){
+  var el = $("toast"); el.textContent = msg; el.style.display="block";
+  clearTimeout(el._t); el._t = setTimeout(function(){ el.style.display="none"; }, 2600);
+}
+function esc(s){ return String(s).replace(/[&<>"']/g, function(c){
+  return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; });
+}
+function fmtDur(ms){
+  ms = Math.max(0, ms);
+  var s = Math.floor(ms/1000), h = Math.floor(s/3600), m = Math.floor((s%3600)/60), ss = s%60;
+  var p = function(n){ return (n<10?"0":"")+n; };
+  return h>0 ? h+":"+p(m)+":"+p(ss) : p(m)+":"+p(ss);
+}
+function fmtClock(ts){
+  var d = new Date(ts);
+  return d.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}) + " · " +
+         d.toLocaleDateString([], {day:"numeric", month:"short"});
+}
+
+/* ============ time parsing (exact + fuzzy, EN + AR) ============ */
+function normalizeDigits(s){
+  var map = {"٠":"0","١":"1","٢":"2","٣":"3","٤":"4","٥":"5","٦":"6","٧":"7","٨":"8","٩":"9",
+             "۰":"0","۱":"1","۲":"2","۳":"3","۴":"4","۵":"5","۶":"6","۷":"7","۸":"8","۹":"9"};
+  return s.replace(/[٠-٩۰-۹]/g, function(c){ return map[c] || c; });
+}
+function unitToMs(num, unit){
+  var u = unit.toLowerCase();
+  if(/^d/.test(u) || u.indexOf("يوم")===0) return num*86400000;
+  if(/^h/.test(u) || u==="س" || u.indexOf("ساع")===0) return num*3600000;
+  if(/^m/.test(u) || u==="د" || u.indexOf("دقيق")===0) return num*60000;
+  if(/^s/.test(u) || u.indexOf("ثاني")===0 || u.indexOf("ثوان")===0) return num*1000;
+  return null;
+}
+var FUZZY = [
+  [/شويتين/i, function(){ return 300000; }],                       /* شويتين = a double-little = ~5m */
+  [/كمان\s*شوية/i, function(){ return 300000; }],                 /* كمان شوية = a bit more */
+  [/\bhalf\s+(?:an\s+)?hour\b|نص\s*ساعة|نصف\s*ساعة/i, function(){ return 1800000; }],
+  [/\bhalf\s+(?:an?\s+)?minute\b|نص\s*دقيقة|نصف\s*دقيقة/i, function(){ return 30000; }],
+  [/\bquarter\s+of\s+an\s+hour\b|\ba\s+quarter\s+hour\b|ربع\s*ساعة/i, function(){ return 900000; }],
+  [/\b(?:a\s+)?couple\s+of\s+(seconds?|secs?|minutes?|mins?|hours?|hrs?|days?)\b|\bcouple\s+(seconds?|secs?|minutes?|mins?|hours?|hrs?)\b/i,
+    function(m){ var u = m[1]||m[2]; return unitToMs(2, u); }],
+  [/\b(?:a\s+)?few\s+(seconds?|secs?|minutes?|mins?|hours?|hrs?)\b/i,
+    function(m){ return unitToMs(3, m[1]); }],
+  [/\bsome\s+(seconds?|secs?|minutes?|mins?|hours?)\b/i,
+    function(m){ return unitToMs(10, m[1]); }],
+  [/\bseveral\s+(seconds?|secs?|minutes?|mins?|hours?)\b/i,
+    function(m){ return unitToMs(5, m[1]); }],
+  [/\bin\s+a\s+(sec|secs|second|seconds)\b|بعد\s+(ثانية|ثانيه)/i, function(){ return 10000; }],
+  [/\bin\s+a\s+moment\b|بعد\s*(لحظة|لحظه)/i, function(){ return 30000; }],
+  [/\bin\s+a\s+minute\b|بعد\s*دقيقة\b/i, function(){ return 60000; }],
+  [/\bin\s+a\s+(bit|while)\b|(?:^|\s)قريبا?(?=\s|$)/i, function(){ return 300000; }],
+  [/\bsoon\b/i, function(){ return 300000; }],
+  [/\blater\b|بعدين/i, function(){ return 3600000; }],
+  [/(?:بعد|خلال|في)?\s*(شوية|شويه)/i, function(){ return 300000; }],
+  [/(?:بعد|خلال|في)?\s*(ثواني|ثوانٍ|ثوان)/i, function(){ return 10000; }],
+  [/(?:بعد|خلال|في)?\s*(كام|كم)\s*(ثانية|ثواني)/i, function(){ return 10000; }],
+  [/(?:بعد|خلال|في)?\s*(كام|كم)\s*(دقيقة|دقائق)/i, function(){ return 600000; }],
+  [/(?:بعد|خلال|في)?\s*(كام|كم)\s*(ساعة|ساعات)/i, function(){ return 7200000; }],
+  [/\bin\s+an?\s+hour\b|بعد\s*ساعة|خلال\s*ساعة/i, function(){ return 3600000; }],
+  [/\bin\s+an?\s+minute\b/, function(){ return 60000; }],
+  [/دقيقتين/i, function(){ return 120000; }],
+  [/ساعتين/i, function(){ return 7200000; }],
+  [/يومين/i, function(){ return 172800000; }],
+  [/لحظة|لحظه/i, function(){ return 30000; }]
+];
+var TYPO_EN = [
+  [/\bcoubles?\b/gi, "couple"], [/\bcuple\b/gi, "couple"],
+  [/\bsecounds?\b/gi, "second"], [/\bminut\b/gi, "minute"], [/\bminets\b/gi, "minutes"],
+  [/\bhoures?\b/gi, "hour"], [/\bminuite?s?\b/gi, "minute"]
+];
+var TYPO_AR = [
+  [/شويه/g, "شوية"], [/كده/g, "كدا"], [/ثوانيه/g, "ثواني"], [/دقيقي/g, "دقيقة"],
+  [/اثنين/g, "اتنين"], [/ثلاثة/g, "تلاتة"], [/أربعة|اربعه/g, "اربعة"],
+  [/خمسه|خماية/g, "خمسة"], [/سته/g, "ستة"], [/سبعه/g, "سبعة"],
+  [/ثمانية|تمنية/g, "تمانية"], [/تسعه/g, "تسعة"], [/عشره/g, "عشرة"],
+  [/مساء/g, "مسا"], [/دقائق/g, "دقايق"]
+];
+function prepText(raw){
+  var s = normalizeDigits(raw);
+  TYPO_AR.forEach(function(p){ s = s.replace(p[0], p[1]); });
+  TYPO_EN.forEach(function(p){ s = s.replace(p[0], p[1]); });
+  s = s.replace(/[أإآ]/g, "ا").replace(/ى/g, "ي");
+  return s;
+}
+/* Egyptian Arabic number words -> value (minutes default) */
+var ARNUM = {
+  "اتنين":2, "تلات":3, "تلاتة":3, "تلاتاية":3, "اربع":4, "اربعة":4,
+  "خمس":5, "خمسة":5, "خمساية":5, "ست":6, "ستة":6, "سبع":7, "سبعة":7,
+  "تمنية":8, "تمانية":8, "تسع":9, "تسعة":9, "عشر":10, "عشرة":10, "عشراية":10
+};
+var ARUNIT = { "ثانية":1000, "ثواني":1000, "دقيقة":60000, "دقايق":60000, "ساعة":3600000, "ساعات":3600000 };
+var NUMW = "(اتنين|تلاتة|تلاتاية|تلات|اربعة|اربع|خمسة|خمساية|خمس|ستة|ست|سبعة|سبع|تمنية|تمانية|تسعة|تسع|عشرة|عشراية|عشر)";
+var UNITW = "(ثانية|ثواني|دقيقة|دقايق|ساعة|ساعات)";
+function arNumMs(numWord, unitWord){
+  var n = ARNUM[numWord]; if(!n) return null;
+  var u = unitWord ? ARUNIT[unitWord] : 60000;   /* no unit said? minutes is the intent */
+  return n * u;
+}
+/* quoted-speech guard: time words said BY someone else (narrated) are not the user's reminder */
+function narrated(src, phrase){
+  var idx = src.indexOf(phrase);
+  if(idx < 0) return false;
+  var back = src.slice(Math.max(0, idx - 34), idx);
+  return /قال|قالت|قالوا|يقول|told me|he said|she said|they said|says/i.test(back);
+}
+function narratedOK(src, phrase, opts){
+  if(opts && opts.ignoreNarration) return true;   /* explicit فكرني/remind me said by the user overrides narration guard */
+  return !narrated(src, phrase);
+}
+function parseWhen(raw, opts){
+  opts = opts || {};
+  if(!raw || !raw.trim()) return null;
+  var p = prepText(raw);
+  var src = p;
+  var s = p.toLowerCase();
+  var m;
+  m = s.match(/(?:\bin\b|\bafter\b|بعد|خلال)\s*(\d+(?:\.\d+)?)\s*(seconds?|secs?|s\b|minutes?|mins?|m\b|hours?|hrs?|h\b|ثانية|ثواني|ثوانٍ|ثوان|دقيقة|دقائق|ساعة|ساعات|س\b|د\b|يوم|ايام|أيام)/);
+  if(m){ var ms = unitToMs(parseFloat(m[1]), m[2]); if(ms && narratedOK(src, m[0], opts)) return {dueAt: Date.now()+ms, phrase:m[0]}; }
+  m = s.match(/\b(\d+)\s*(seconds?|secs?|minutes?|mins?|hours?|hrs?|days?)\b/);
+  if(m){
+    var u2 = m[2].toLowerCase();
+    var ms2 = /^d/.test(u2) ? parseInt(m[1],10)*86400000 : unitToMs(parseInt(m[1],10), m[2]);
+    if(ms2 && narratedOK(src, m[0], opts)) return {dueAt: Date.now()+ms2, phrase:m[0]};
+  }
+  m = s.match(/(\d+)\s*(ثانية|ثواني|ثوانٍ|ثوان|دقيقة|دقائق|ساعة|ساعات)/);
+  if(m){ var ms3 = unitToMs(parseInt(m[1],10), m[2]); if(ms3 && narratedOK(src, m[0], opts)) return {dueAt: Date.now()+ms3, phrase:m[0]}; }
+  var src = p;
+  /* Egyptian dialect numbers: "كمان خمساية", "كمان خمسة" -> 5 min */
+  m = src.match(new RegExp("(?:كمان|بعد|خلال)\\s*" + NUMW + "(?:\\s*" + UNITW + ")?"));
+  if(m){ var ams = arNumMs(m[1], m[2]); if(ams && narratedOK(src, m[0], opts)) return {dueAt: Date.now()+ams, phrase:m[0]}; }
+  /* "خمس دقايق كدا" -> 5 min (number word + unit, كدا ignored as approx marker) */
+  m = src.match(new RegExp(NUMW + "\\s*" + UNITW));
+  if(m){ var ams2 = arNumMs(m[1], m[2]); if(ams2 && narratedOK(src, m[0], opts)) return {dueAt: Date.now()+ams2, phrase:m[0]}; }
+  for(var i=0; i<FUZZY.length; i++){
+    var mm = src.match(FUZZY[i][0]);
+    if(mm){
+      var fms = FUZZY[i][1](mm);
+      if(fms && narratedOK(src, mm[0], opts)) return {dueAt: Date.now()+fms, phrase:mm[0]};
+    }
+  }
+  var hasTomorrow = /tomorrow|بكرة|بكره|غدا|بكرا/.test(s);
+  /* clock time with word numbers: الساعة خمسة المسا */
+  m = src.match(new RegExp("الساعة\\s*" + NUMW + "\\s*(مسا|م|ص|صباحا)?"));
+  if(m){
+    var wh = ARNUM[m[1]], wap = m[2];
+    if(wap === "مسا" || wap === "م"){ if(wh < 12) wh += 12; }
+    else if(wh <= 7){ wh += 12; }
+    var wd = new Date(); wd.setHours(wh, 0, 0, 0);
+    if(wd.getTime() <= Date.now() || hasTomorrow) wd.setDate(wd.getDate() + 1);
+    if(narratedOK(src, m[0], opts)) return {dueAt: wd.getTime(), phrase: m[0]};
+  }
+  m = s.match(/(?:\bat\b|الساعة|في الساعة|فالساعة)\s*(\d{1,2})(?::(\d{2}))?\s*(am|pm|ص|صباحا?|م|مساءا?|مسا)?/);
+  if(m){
+    var h = parseInt(m[1],10), min = m[2]?parseInt(m[2],10):0, ap = m[3] || "";
+    if(h>=0 && h<=23 && min>=0 && min<=59){
+      if(ap==="pm"||ap==="م"||ap.indexOf("مس")===0){ if(h<12) h+=12; }
+      else if(ap==="am"||ap==="ص"||ap.indexOf("صب")===0){ if(h===12) h=0; }
+      else if(h<=7 && !hasTomorrow){ h+=12; }
+      var d = new Date(); d.setHours(h,min,0,0);
+      if(d.getTime() <= Date.now() || hasTomorrow) d.setDate(d.getDate()+1);
+      if(narratedOK(src, m[0], opts)) return {dueAt: d.getTime(), phrase:m[0]};
+    }
+  }
+  if(hasTomorrow){
+    var d2 = new Date(); d2.setDate(d2.getDate()+1); d2.setHours(9,0,0,0);
+    return {dueAt: d2.getTime(), phrase:"tomorrow"};
+  }
+  return null;
+}
+
+/* ============ repetition-loop cleaner ============ */
+function collapseLoops(text){
+  function sweep(words, minCount, minN){
+    var cleaned = false;
+    var maxN = Math.min(30, Math.floor(words.length / 3));
+    for(var n = maxN; n >= minN; n--){
+      var out = [], i = 0;
+      while(i < words.length){
+        var pat = null, count = 1, j = i;
+        if(i + 2*n <= words.length){
+          pat = words.slice(i, i+n).join(" ");
+          j = i + n;
+          while(j + n <= words.length && words.slice(j, j+n).join(" ") === pat){ count++; j += n; }
+        }
+        if(pat && count >= minCount){
+          out = out.concat(words.slice(i, i+n));
+          cleaned = true;
+          i = j;
+        } else {
+          out.push(words[i]); i++;
+        }
+      }
+      words = out;
+    }
+    return { words: words, cleaned: cleaned };
+  }
+  var words = text.split(/\s+/).filter(Boolean);
+  var r1 = sweep(words, 3, 3);
+  var r2 = sweep(r1.words, 2, 4);
+  return { text: r2.words.join(" ").trim(), cleaned: r1.cleaned || r2.cleaned };
+}
+
+/* ============ organizer: transcript -> title + bullets ============ */
+var FILLERS = /^(um+|uh+|erm+|like,|so,+|okay,+|ok,+|امم+|اه+|يعني|خلاص|طيب|بص|يعني,)[\s,]+/i;
+var LEADCONJ = /^(also|and|plus|but|so|then|also,|and,|plus,|but,|so,|then,|i also|i need to also|i forgot that i have to|i forgot i have to|i have to|i need to|i want to|انا محتاج|محتاج|لازم|وكمان|كمان|كذلك|ثم|برضه)[\s,]+/i;
+var TAILFILL = /\s*(and so on|and so forth|etc\.?|or so|so please|please\.\.\.|و كده|وكده|وكدا|و هكذا|وخلاص|او كده|او كدا)\s*$/i;
+var METATALK = /(take that into account|keep that in mind|as i said|like i said|you know what i mean|so i mean|i mean,|got it\??$|^okay\??$)/i;
+function organize(text){
+  var parts = normalizeDigits(text).replace(/\s+/g, " ")
+    .split(/[.!؟?\n؛;]+|،/)
+    .map(function(x){ return x.trim(); })
+    .filter(function(x){ return x.length > 1; });
+  var expanded = [];
+  parts.forEach(function(p){
+    if(p.length > 160){
+      p.split(/,|،|\s+and\s+|\s+و\s+/).forEach(function(q){
+        q = q.trim(); if(q.length > 1) expanded.push(q);
+      });
+    } else expanded.push(p);
+  });
+  parts = expanded.length ? expanded : [text.trim()];
+  var seen = {}, clean = [];
+  parts.forEach(function(p){
+    var prev = null;
+    while(prev !== p){ prev = p; p = p.replace(FILLERS, "").replace(LEADCONJ, "").replace(TAILFILL, ""); }
+    p = p.trim().replace(/\s+/g, " ");
+    if(!p) return;
+    if(p.length < 45 && METATALK.test(p) && parts.length > 2) return;   /* drop pure meta-talk */
+    if(!/[\u0600-\u06FF]/.test(p)) p = p.charAt(0).toUpperCase() + p.slice(1);
+    var key = p.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, "").replace(/\s+/g, " ").slice(0, 60);
+    if(key && !seen[key]){ seen[key] = 1; clean.push(p); }
+  });
+  parts = clean.length ? clean : [text.trim()];
+  var title = parts[0].length > 90 ? parts[0].slice(0, 90) + "…" : parts[0];
+  return { title: title, bullets: parts.slice(1) };
+}
+
+/* ============ reminder splitting: multiple فكرني/remind me = multiple reminders ============ */
+var REM_MARK = /(?:فكّرني|فكرني|فكرنى|فكّرنى|ذكرني|ذكرنى|remind me)(?:\s+(?:بها|بيها|بكده|بكدا|of it|about it))?/gi;
+function explicitTailCheck(text){
+  var tail = prepText(text).trim().split(/\s+/).slice(-7).join(" ");
+  return REM_MARK.test(tail);
+}
+function splitReminders(text){
+  var markers = [];
+  var m;
+  REM_MARK.lastIndex = 0;
+  while((m = REM_MARK.exec(text)) !== null){ markers.push({idx: m.index, len: m[0].length}); }
+  if(markers.length < 2){
+    var org = organize(text);
+    return [{ title: org.title, bullets: org.bullets, whenText: text, delay: null, quoted: false }];
+  }
+  var rems = [];
+  for(var i = 0; i < markers.length; i++){
+    var from = markers[i].idx;
+    var to = (i + 1 < markers.length) ? markers[i + 1].idx : text.length;
+    var seg = text.substring(from, to).trim();
+    if(!seg || seg.length < 3) continue;
+    var so = organize(seg);
+    rems.push({ title: so.title, bullets: so.bullets, whenText: seg, delay: null, quoted: false });
+  }
+  if(!rems.length){
+    var org2 = organize(text);
+    return [{ title: org2.title, bullets: org2.bullets, whenText: text, delay: null, quoted: false }];
+  }
+  return rems;
+}
+
+/* ============ state / storage ============ */
+var KEY = "voiceAlarms_v1";
+var TONEKEY = "voiceAlarm_tone";
+var MODELKEY = "voiceAlarm_model2";
+var VLANGKEY = "voiceAlarm_vlang";
+var SNOOZE_MS = 5000;
+var SPACED = [5, 30, 120, 1440, 4320];
+var tasks = [];
+var manualDue = null;
+var spacedOn = false;
+var tonePref = "classic";
+var modelPref = "small";
+var vlang = "auto";            /* auto | en | ar */
+var orgTouched = false;
+try{ tonePref = localStorage.getItem(TONEKEY) || "classic"; }catch(e){}
+try{ modelPref = localStorage.getItem(MODELKEY) || "small"; }catch(e){}
+try{ vlang = localStorage.getItem(VLANGKEY) || "auto"; }catch(e){}
+var ENGINEKEY = "voiceAlarm_engine", GKEY = "voiceAlarm_gkey", GQKEY = "voiceAlarm_groqkey", AUTOKEY2 = "voiceAlarm_auto";
+var enginePref = "local", geminiKey = "", groqKey = "", autoOn = true;
+try{ geminiKey = localStorage.getItem(GKEY) || ""; }catch(e){}
+try{ groqKey = localStorage.getItem(GQKEY) || ""; }catch(e){}
+try{ enginePref = localStorage.getItem(ENGINEKEY) || (geminiKey ? "gemini" : "local"); }catch(e){}
+try{ autoOn = localStorage.getItem(AUTOKEY2) !== "0"; }catch(e){}
+function save(){
+  try{
+    var payload = JSON.stringify(tasks);
+    if(payload.length > 4500000){
+      for(var i=0; i<tasks.length && payload.length > 4500000; i++){
+        if(tasks[i].audio){ delete tasks[i].audio; payload = JSON.stringify(tasks); }
+      }
+    }
+    localStorage.setItem(KEY, payload);
+  }catch(e){}
+}
+function load(){
+  try{
+    tasks = JSON.parse(localStorage.getItem(KEY) || "[]");
+    var now = Date.now();
+    tasks.forEach(function(tk){
+      if(tk.dueAt <= now) tk.overdue = true;
+      tk._fired = false;
+    });
+  }catch(e){ tasks = []; }
+}
+
+/* ============ history + calendar ============ */
+var HISTKEY = "voiceAlarm_hist_v1";
+var hist = [];
+var calY, calM, selDay;
+function loadHist(){
+  try{ hist = JSON.parse(localStorage.getItem(HISTKEY) || "[]"); }catch(e){ hist = []; }
+}
+function saveHist(){
+  try{
+    var payload = JSON.stringify(hist);
+    while(payload.length > 4500000){
+      var dropped = false;
+      for(var i = hist.length - 1; i >= 0; i--){
+        if(hist[i].audio){ delete hist[i].audio; dropped = true; break; }
+      }
+      payload = JSON.stringify(hist);
+      if(!dropped) break;
+    }
+    localStorage.setItem(HISTKEY, payload);
+  }catch(e){}
+}
+function pushToHistory(tk){
+  hist.unshift({
+    id: tk.id + "h" + Date.now(),
+    title: tk.title, notes: tk.notes || "",
+    audio: tk.audio || null,
+    dueAt: tk.dueAt, createdAt: tk.createdAt || Date.now(),
+    doneAt: Date.now()
+  });
+  if(hist.length > 150) hist = hist.slice(0, 150);
+  saveHist(); renderHist(); refreshViews();
+}
+function dayKey(ts){
+  var d = new Date(ts);
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+}
+function refreshViews(){ renderCal(); renderDayList(); }
+
+/* ---- history UI + re-arm ---- */
+function renderHist(){
+  var host = $("histList");
+  if(!hist.length){
+    host.innerHTML = "<div class='empty'>Nothing yet — finished alarms land here with their points & audio, ready to re-ring.</div>";
+    return;
+  }
+  host.innerHTML = hist.map(function(e){
+    var audioTag = e.audio ? "<audio controls preload='none' src='" + e.audio.dataUrl + "' style='height:32px;max-width:220px'></audio>" : "";
+    return "<div class='hist' data-hid='" + e.id + "'>" +
+      "<div class='t' dir='auto'>" + esc(e.title) + "</div>" +
+      (e.notes ? "<div class='n' dir='auto'>• " + esc(e.notes).replace(/\n/g, "\n• ") + "</div>" : "") +
+      "<div class='meta'>✓ done " + fmtClock(e.doneAt) + " · planned " + fmtClock(e.dueAt) + "</div>" +
+      "<div class='rearm'>" +
+        "<input type='number' min='0' max='99' placeholder='0' data-h='" + e.id + "h'> <span class='u'>hrs</span>" +
+        "<input type='number' min='0' max='59' placeholder='0' data-h='" + e.id + "m'> <span class='u'>min</span>" +
+        "<input type='number' min='0' max='59' placeholder='0' data-h='" + e.id + "s'> <span class='u'>sec</span>" +
+        "<button class='btn' style='padding:8px 14px;font-size:.85rem' data-hstart='" + e.id + "'>▶ Ring again</button>" +
+        "<button class='x' data-hdel='" + e.id + "'>✖</button>" +
+      "</div>" +
+      (audioTag ? "<div style='margin-top:8px'>" + audioTag + "</div>" : "") +
+    "</div>";
+  }).join("");
+  host.querySelectorAll("[data-hstart]").forEach(function(b){
+    b.onclick = function(){ rearm(b.getAttribute("data-hstart")); };
+  });
+  host.querySelectorAll("[data-hdel]").forEach(function(b){
+    b.onclick = function(){
+      hist = hist.filter(function(x){ return x.id !== b.getAttribute("data-hdel"); });
+      saveHist(); renderHist(); refreshViews();
+    };
+  });
+}
+function rearm(id){
+  var e = null;
+  for(var i=0;i<hist.length;i++){ if(hist[i].id === id){ e = hist[i]; break; } }
+  if(!e) return;
+  var g = function(suf){ var v = parseInt(document.querySelector("[data-h='" + id + suf + "']").value, 10); return (isFinite(v) && v > 0) ? v : 0; };
+  var total = g("h")*3600 + g("m")*60 + g("s");
+  if(!total){ toast("⚠ Put a number — e.g. 3 in the sec box"); return; }
+  addTask(e.title, e.notes, Date.now() + total*1000, e.audio, {});
+  toast("⏱ Re-armed — rings in " + fmtDur(total*1000));
+}
+$("histClear").onclick = function(){
+  if(!hist.length) return;
+  if(confirm("Delete ALL history permanently?")){
+    hist = []; saveHist(); renderHist(); refreshViews();
+  }
+};
+
+/* ---- calendar UI ---- */
+function itemsFor(dayK){
+  var out = [];
+  tasks.forEach(function(tk){ if(dayKey(tk.dueAt) === dayK) out.push({type:"a", when: tk.dueAt, tk: tk}); });
+  hist.forEach(function(e){ if(dayKey(e.dueAt || e.doneAt) === dayK) out.push({type:"h", when: e.doneAt, e: e}); });
+  out.sort(function(a,b){ return a.when - b.when; });
+  return out;
+}
+function renderCal(){
+  if(calY == null){ var n = new Date(); calY = n.getFullYear(); calM = n.getMonth(); }
+  $("calTitle").textContent = new Date(calY, calM, 1).toLocaleDateString([], {month:"long", year:"numeric"});
+  var counts = {};
+  tasks.forEach(function(tk){ var k = dayKey(tk.dueAt); counts[k] = counts[k] || {a:0,h:0}; counts[k].a++; });
+  hist.forEach(function(e){ var k = dayKey(e.dueAt || e.doneAt); counts[k] = counts[k] || {a:0,h:0}; counts[k].h++; });
+  var startDow = new Date(calY, calM, 1).getDay();
+  var dim = new Date(calY, calM + 1, 0).getDate();
+  var todayK = dayKey(Date.now());
+  var html = "";
+  for(var b = 0; b < startDow; b++) html += "<div class='calDay blank'></div>";
+  for(var d = 1; d <= dim; d++){
+    var k = calY + "-" + String(calM+1).padStart(2,"0") + "-" + String(d).padStart(2,"0");
+    var c = counts[k] || {a:0,h:0};
+    var cls = "calDay" + (k === todayK ? " today" : "") + (k === selDay ? " sel" : "");
+    html += "<div class='" + cls + "' data-day='" + k + "'>" + d +
+      "<div class='calDots'>" +
+        (c.a ? "<span class='calDotA'></span>" : "") +
+        (c.h ? "<span class='calDotH'></span>" : "") +
+      "</div>" +
+    "</div>";
+  }
+  $("calGrid").innerHTML = html;
+  $("calGrid").querySelectorAll("[data-day]").forEach(function(cell){
+    cell.onclick = function(){
+      selDay = cell.getAttribute("data-day");
+      renderCal(); renderDayList();
+    };
+  });
+}
+function renderDayList(){
+  if(!selDay) return;
+  var items = itemsFor(selDay);
+  var d = new Date(selDay + "T00:00:00");
+  var head = d.toLocaleDateString([], {weekday:"long", day:"numeric", month:"long"}) + " — " + items.length + " item" + (items.length === 1 ? "" : "s");
+  var html = "<div class='lbl' style='margin-bottom:8px'>" + head + "</div>";
+  if(!items.length){
+    html += "<div class='empty'>Nothing this day — say a date in a voice note (“tomorrow at 9”) or re-arm something here.</div>";
+  } else {
+    items.forEach(function(it){
+      if(it.type === "a"){
+        var tk = it.tk;
+        html += "<div class='dayItem'><div class='dt' dir='auto'>" + esc(tk.title) + "</div>" +
+          "<div class='dm'>🕘 alarm at " + new Date(tk.dueAt).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}) +
+          (tk.dueAt > Date.now() ? " · in <span data-cd='" + tk.id + "'>–</span>" : "") + "</div>" +
+          (tk.notes ? "<div class='dn' dir='auto'>• " + esc(tk.notes).replace(/\n/g, "\n• ") + "</div>" : "") + "</div>";
+      } else {
+        var e = it.e;
+        html += "<div class='dayItem'><div class='dt' dir='auto'>" + esc(e.title) + "</div>" +
+          "<div class='dm'>✓ done " + new Date(e.doneAt).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}) + "</div>" +
+          (e.notes ? "<div class='dn' dir='auto'>• " + esc(e.notes).replace(/\n/g, "\n• ") + "</div>" : "") + "</div>";
+      }
+    });
+  }
+  $("dayList").innerHTML = html;
+}
+$("calPrev").onclick = function(){ calM--; if(calM < 0){ calM = 11; calY--; } renderCal(); };
+$("calNext").onclick = function(){ calM++; if(calM > 11){ calM = 0; calY++; } renderCal(); };
+$("calTitle").onclick = function(){
+  var n = new Date(); calY = n.getFullYear(); calM = n.getMonth(); selDay = dayKey(Date.now());
+  renderCal(); renderDayList();
+};
+
+/* ============ audio context ============ */
+var actx = null;
+function ensureCtx(){
+  if(!actx){ try{ actx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} }
+  if(actx && actx.state === "suspended"){ actx.resume().catch(function(){}); }
+  return actx;
+}
+document.addEventListener("pointerdown", function once(){ ensureCtx(); }, {once:true});
+
+/* ============ ringtones ============ */
+var ringMaster = null, ringInt = null, ringCycle = 0, sirenNodes = null;
+function envOsc(c, t0, freq, dur, type, vol, decay, dest){
+  var o = c.createOscillator(), g = c.createGain();
+  o.type = type; o.frequency.value = freq;
+  if(decay){
+    g.gain.setValueAtTime(Math.max(0.001,vol), t0);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  } else {
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.linearRampToValueAtTime(vol, t0 + 0.012);
+    g.gain.setValueAtTime(vol, Math.max(t0+0.013, t0 + dur - 0.03));
+    g.gain.linearRampToValueAtTime(0.0001, t0 + dur);
+  }
+  o.connect(g); g.connect(dest);
+  o.start(t0); o.stop(t0 + dur + 0.05);
+}
+var TONES = {
+  classic: { cycle: 2.0, vol0: 0.14, step: 0.045, max: 0.55, play: function(c, t0, g, dest){
+    for(var i=0; i<4; i++){
+      envOsc(c, t0 + i*0.26, 956, 0.14, "triangle", g, false, dest);
+      envOsc(c, t0 + i*0.26, 1912, 0.14, "sine", g*0.3, false, dest);
+    }
+  }},
+  chime: { cycle: 2.1, vol0: 0.18, step: 0.05, max: 0.6, play: function(c, t0, g, dest){
+    var notes = [1046.5, 1318.5, 1568.0, 2093.0];
+    notes.forEach(function(f, i){
+      envOsc(c, t0 + i*0.22, f, 1.0, "sine", g, true, dest);
+      envOsc(c, t0 + i*0.22, f*2, 0.45, "sine", g*0.22, true, dest);
+    });
+  }},
+  gentle: { cycle: 3.2, vol0: 0.14, step: 0.04, max: 0.5, play: function(c, t0, g, dest){
+    envOsc(c, t0,        659.3, 1.3, "sine", g,     true, dest);
+    envOsc(c, t0 + 0.55, 493.9, 1.5, "sine", g,     true, dest);
+    envOsc(c, t0 + 1.10, 392.0, 1.8, "sine", g*0.9, true, dest);
+  }},
+  siren: { continuous: true }
+};
+function startSirenContinuous(){
+  var c = ensureCtx(); if(!c || sirenNodes) return;
+  var osc = c.createOscillator(), lfo = c.createOscillator(), lfoGain = c.createGain(), g = c.createGain();
+  osc.type = "square"; osc.frequency.value = 820;
+  lfo.type = "square"; lfo.frequency.value = 2.4;
+  lfoGain.gain.value = 130; lfo.connect(lfoGain); lfoGain.connect(osc.frequency);
+  g.gain.value = 0.0001; g.gain.exponentialRampToValueAtTime(0.5, c.currentTime + 0.05);
+  osc.connect(g); g.connect(c.destination);
+  osc.start(); lfo.start();
+  sirenNodes = {osc:osc, lfo:lfo, g:g};
+}
+function stopSirenContinuous(){
+  if(!sirenNodes || !actx) return;
+  try{
+    sirenNodes.g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + 0.1);
+    var o = sirenNodes.osc, l = sirenNodes.lfo;
+    setTimeout(function(){ try{o.stop(); l.stop();}catch(e){} }, 200);
+  }catch(e){}
+  sirenNodes = null;
+}
+function startRing(){
+  var c = ensureCtx(); if(!c) return;
+  stopRing();
+  var name = TONES[tonePref] ? tonePref : "classic";
+  if(name === "siren"){ startSirenContinuous(); return; }
+  ringMaster = c.createGain(); ringMaster.gain.value = 1; ringMaster.connect(c.destination);
+  var def = TONES[name];
+  ringCycle = 0;
+  function cycle(){
+    if(!ringMaster) return;
+    var g = Math.min(def.max, def.vol0 + ringCycle * def.step);
+    def.play(c, c.currentTime + 0.05, g, ringMaster);
+    ringCycle++;
+  }
+  cycle();
+  ringInt = setInterval(cycle, def.cycle * 1000);
+}
+function stopRing(){
+  if(ringInt){ clearInterval(ringInt); ringInt = null; }
+  if(ringMaster){
+    try{ ringMaster.gain.setTargetAtTime(0.0001, actx.currentTime, 0.05); }catch(e){}
+    var m = ringMaster; setTimeout(function(){ try{ m.disconnect(); }catch(e){} }, 350);
+    ringMaster = null;
+  }
+  stopSirenContinuous();
+  ringCycle = 0;
+}
+document.querySelectorAll(".chip.tone").forEach(function(ch){
+  var name = ch.getAttribute("data-tone");
+  ch.classList.toggle("on", name === tonePref);
+  ch.onclick = function(){
+    tonePref = name;
+    try{ localStorage.setItem(TONEKEY, tonePref); }catch(e){}
+    document.querySelectorAll(".chip.tone").forEach(function(x){ x.classList.toggle("on", x===ch); });
+    var c = ensureCtx(); if(!c) return;
+    if(name === "siren"){ startSirenContinuous(); setTimeout(stopSirenContinuous, 1200); return; }
+    var def = TONES[name];
+    var prev = c.createGain(); prev.gain.value = 1; prev.connect(c.destination);
+    def.play(c, c.currentTime + 0.03, 0.32, prev);
+    setTimeout(function(){ try{ prev.disconnect(); }catch(e){} }, def.cycle * 1000 + 200);
+  };
+});
+
+/* ============ vibration ============ */
+var vibTimer = null;
+function startVibrate(){ if(navigator.vibrate){ navigator.vibrate([600,300,600,300]); vibTimer = setInterval(function(){ navigator.vibrate([600,300,600,300]); }, 1900); } }
+function stopVibrate(){ if(vibTimer){ clearInterval(vibTimer); vibTimer=null; } try{navigator.vibrate && navigator.vibrate(0);}catch(e){} }
+
+/* ============ mic recording + live transcription ============ */
+var mediaRec = null, recChunks = [], recStream = null, recTimer = null, recStart = 0;
+var srOnly = null, srAcc = "";
+var recLiveText = "";
+var silentRec = false;
+function makeSilenceBlob(durMs){
+  var sr = 16000, n = Math.max(1, Math.ceil(durMs / 1000 * sr));
+  var buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+  function ws(o, s){ for(var i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); }
+  ws(0,"RIFF"); v.setUint32(4, 36 + n*2, true); ws(8,"WAVE"); ws(12,"fmt ");
+  v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,sr,true); v.setUint32(28,sr*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true);
+  ws(36,"data"); v.setUint32(40, n*2, true);
+  return new Blob([buf], { type: "audio/wav" });
+}
+var currentAudio = null;
+var SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+function recLang(){
+  if(vlang === "en") return "en-US";
+  if(vlang === "ar") return "ar-EG";
+  return ((navigator.language || "en").toLowerCase().indexOf("ar") === 0) ? "ar-EG" : "en-US";
+}
+function startRecognition(onInterim, onFinal, onErr){
+  if(!SpeechRec){ $("interim").textContent = "Live typing unavailable in this browser — recording still saved; use upload + AI, or type."; return null; }
+  var r = new SpeechRec();
+  r.lang = recLang();
+  /* Android Chrome silently fails with continuous=true - use single-shot segments there */
+  r.interimResults = true; r.continuous = !IS_MOBILE;
+  var finalAcc = "", lastFinalIdx = -1;
+  r.onresult = function(ev){
+    /* interim results get REPLACED between events - only append true finals once */
+    var interim = "";
+    for(var i=ev.resultIndex; i<ev.results.length; i++){
+      if(ev.results[i].isFinal){
+        if(i > lastFinalIdx){ finalAcc += ev.results[i][0].transcript + " "; lastFinalIdx = i; }
+      } else interim += ev.results[i][0].transcript;
+    }
+    if(onInterim) onInterim(finalAcc + interim, interim);
+    if(onFinal) onFinal(finalAcc);
+  };
+  r.onerror = function(ev){ if(onErr) onErr(ev.error); };
+  return r;
+}
+var IS_MOBILE = /Android|iPhone|iPad|Mobi/i.test(navigator.userAgent || "");
+var APP_VERSION = "v27";
+function micState(cb){
+  if(navigator.permissions && navigator.permissions.query){
+    navigator.permissions.query({name:"microphone"}).then(function(p){ cb(p.state); }).catch(function(){ cb("unknown"); });
+  } else cb("unknown");
+}
+function pickMime(){
+  var list = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg;codecs=opus"];
+  for(var i = 0; i < list.length; i++){
+    try{ if(MediaRecorder.isTypeSupported(list[i])) return list[i]; }catch(e){}
+  }
+  return "";
+}
+var lvlRAF = null, lvlSrc = null, lvlAn = null;
+function startMeter(stream){
+  try{
+    var c = ensureCtx(); if(!c) return;
+    lvlSrc = c.createMediaStreamSource(stream);
+    lvlAn = c.createAnalyser(); lvlAn.fftSize = 256;
+    lvlSrc.connect(lvlAn);
+    var buf = new Uint8Array(lvlAn.frequencyBinCount);
+    var bars = document.querySelectorAll(".lv");
+    $("lvlWrap").style.display = "flex";
+    function loop(){
+      if(!lvlRAF) return;
+      lvlAn.getByteFrequencyData(buf);
+      var avg = 0; for(var i = 0; i < buf.length; i++) avg += buf[i];
+      avg = avg / buf.length / 255;
+      for(var b = 0; b < bars.length; b++){
+        var v = Math.max(12, Math.min(100, avg * 170 * (0.55 + Math.random() * 0.75)));
+        bars[b].style.height = v + "%";
+      }
+      lvlRAF = requestAnimationFrame(loop);
+    }
+    lvlRAF = requestAnimationFrame(loop);
+  }catch(e){}
+}
+function stopMeter(){
+  if(lvlRAF){ cancelAnimationFrame(lvlRAF); lvlRAF = null; }
+  try{ if(lvlSrc) lvlSrc.disconnect(); }catch(e){}
+  lvlSrc = null; lvlAn = null;
+  $("lvlWrap").style.display = "none";
+}
+function startRec(){
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder){
+    toast("🎤 Recording not supported here — upload a voice note instead"); return;
+  }
+  var cloudAudioReady = (enginePref === "gemini" && geminiKey) || (enginePref === "groq" && groqKey);
+  if(false && IS_MOBILE && !cloudAudioReady){ /* v22: phone always records the FILE first - WhatsApp style */
+    /* FREE TRANSCRIPT MODE: Google's built-in speech engine, live, zero downloads */
+    if(!SpeechRec){
+      aiCard("⛔ This browser can't do live transcription",
+        "Your browser has no built-in speech engine.\n" +
+        "→ BEST FIX: open the site in Google Chrome on this phone.\n" +
+        "→ OR: upload a voice note file (📎) instead.\n" +
+        "→ OR: switch to 💻 Local engine (one-time ~250 MB download).", 0, "err");
+      return;
+    }
+    micState(function(state){
+      if(state === "denied"){
+        aiCard("🎤 Microphone is BLOCKED for this site",
+          "Tap the 🔒 (or ⚙) icon next to the address bar → Site settings → Microphone → Allow, then reload the page and try again.", 0, "err");
+        return;
+      }
+      srTranscriptMode();
+    });
+    return;
+  }
+  function noWordsCard(st){
+    aiCard("⚠ Spoke but no words were captured",
+      "Mic permission: " + st + "\n" +
+      "Most common cause: WRONG SPEECH LANGUAGE (Arabic into an English engine = silence).\n" +
+      "→ Set 🎙 SPEECH LANGUAGE (above) to العربية if you spoke Arabic, then 🎤 again.\n" +
+      "Always-works alternative: ⌨️ Keyboard mic button — tap the text box and speak via your keyboard's 🎤.\n" +
+      "With a Gemini key, recordings transcribe in the cloud instead (no engine needed).", 0, "err");
+  }
+  function srTranscriptMode(){
+    /* recognition ONLY: running getUserMedia+MediaRecorder beside SpeechRecognition
+       starves the engine on Android Chrome - words are the product; audio needs a key anyway */
+    srAcc = ""; recLiveText = "";
+    var segRestarts = 0, MAX_SEG = 80;
+    function beginSeg(){
+      if(srOnly === null) return;
+      var rr = startRecognition(
+        function(all){
+          var combined = (srAcc ? srAcc + " " : "") + (all || "");
+          recLiveText = combined.trim();
+          $("interim").innerHTML = "<span class='got'>" + esc(combined) + "</span>";
+          $("taskText").value = combined; updateChip(); updateTimeStatus();
+        },
+        function(all){
+          if(all && all.trim()){
+            srAcc = (srAcc ? srAcc.replace(/\s*$/,"") + " " : "") + all.trim();
+            recLiveText = srAcc;
+            $("taskText").value = srAcc; scheduleAutoOrganize();
+          }
+        },
+        function(err){
+          if(err === "not-allowed" || err === "service-not-allowed"){
+            srOnly = null;
+            aiCard("🎤 Microphone permission denied", "Tap 🔒 next to the address bar → Microphone → Allow, then reload.", 0, "err");
+          } else if(err === "network"){
+            srOnly = null;
+            aiCard("📡 Google speech service unreachable", "Check internet, then tap 🎤 again.", 0, "err");
+          } else if(err !== "no-speech" && err !== "aborted"){
+            toast("🎤 Listening hiccup (" + err + ") — continuing…");
+          }
+        }
+      );
+      if(!rr){ srOnly = null; return; }
+      rr.onend = function(){
+        if(srOnly === null) return;
+        if(++segRestarts > MAX_SEG){ srOnly = null; toast("🎤 Session too long — tap 🎤 to continue"); return; }
+        setTimeout(beginSeg, 200);
+      };
+      try{ rr.start(); if(srOnly !== null && srOnly !== rr) srOnly = rr; }
+      catch(e){ setTimeout(beginSeg, 350); }
+    }
+    srOnly = "starting";
+    recStart = Date.now();
+    $("recBtn").classList.add("rec"); $("recLbl").textContent = "Stop";
+    $("recTime").textContent = "0:00";
+    recTimer = setInterval(function(){ $("recTime").textContent = fmtDur(Date.now()-recStart); }, 500);
+    $("lvlWrap").style.display = "flex";
+    $("lvlWrap").classList.add("listening");
+    var langName = (vlang === "ar") ? "العربية" : (vlang === "en" ? "English" : "auto (" + recLang() + ")");
+    $("interim").textContent = "🔴 Listening in " + langName + " — speak now, tap Stop when done. (Wrong language? Change 🎙 SPEECH LANGUAGE above.)";
+    beginSeg();
+  }
+  navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+    recStream = stream;
+    recLiveText = "";
+    var mo = pickMime();
+    try{ mediaRec = mo ? new MediaRecorder(stream, {mimeType: mo}) : new MediaRecorder(stream); }
+    catch(e){ mediaRec = new MediaRecorder(stream); }
+    recChunks = [];
+    mediaRec.ondataavailable = function(e){ if(e.data && e.data.size) recChunks.push(e.data); };
+    var recSelf = mediaRec;   /* v26 FIX: onstop fires AFTER stopRec nulls mediaRec - use a captured ref */
+    mediaRec.onstop = function(){
+      try{
+      recStream.getTracks().forEach(function(tr){ tr.stop(); });
+      var blob = new Blob(recChunks, {type: (recSelf && recSelf.mimeType) || "audio/webm"});
+      var dur = Date.now() - recStart;
+      if(dur < 400){ toast("⚠ Too short — tap again and speak"); return; }
+      /* quiet/silent recordings are STILL saved - the message must exist, like WhatsApp */
+      var fr = new FileReader();
+      fr.onload = function(){
+        currentAudio = {dataUrl: fr.result, mime: blob.type, name:"rec", source:"rec"};
+        updateAttach();
+        $("attLbl").textContent = "🎙 " + fmtDur(dur) + " — tap ▶ to play";
+        lastNote = saveVoiceNote(currentAudio, dur);
+        if(recLiveText && !geminiKey && !groqKey){
+          /* desktop bonus: live-typed text + recorded audio, zero downloads */
+          finalizePipeline({ transcript: recLiveText, reminders: splitReminders(recLiveText) }, "rule");
+          return;
+        }
+        /* AUTOMATIC: empty note -> say so; else transcribe + analyze + arm, zero taps */
+        blobSilent(blob, function(sil){ sil ? setEmptyTranscript() : transcribeAudio(); });
+      };
+      fr.readAsDataURL(blob);
+      }catch(e){ toast("⚠ Recorder hiccup — saved a placeholder note"); var d = Date.now() - recStart;
+        saveVoiceNote({dataUrl: makeSilenceBlob(d) ? null : null}, 0); rescueNote(d); }
+    };
+    mediaRec.start();
+    recStart = Date.now();
+    $("recBtn").classList.add("rec"); $("recLbl").textContent = "Stop";
+    $("recTime").textContent = "0:00";
+    recTimer = setInterval(function(){ $("recTime").textContent = fmtDur(Date.now()-recStart); }, 500);
+    startMeter(stream);   /* live sound bars like Instagram */
+    if(IS_MOBILE){
+      /* Android: SpeechRecognition and MediaRecorder fight over the mic -> record solo */
+      $("interim").textContent = "🔴 Recording (like WhatsApp)… speak, then tap Stop — your voice note will appear below.";
+    } else {
+      var r = startRecognition(
+        function(all){ $("interim").innerHTML = "<span class='got'>" + esc(all) + "</span>"; },
+        function(all){
+          recLiveText = (all || "").trim();
+          if(recLiveText){
+            $("taskText").value = recLiveText;
+            updateChip(); updateTimeStatus(); scheduleAutoOrganize();
+          }
+        },
+        function(){ $("interim").textContent = "Live typing interrupted — recording continues."; }
+      );
+      if(r){ try{ r.start(); mediaRec._rec = r; }catch(e){} }
+    }
+  }).catch(function(err){
+    var m = String((err && err.name) || "");
+    {
+      /* v25: ANY mic failure still makes the message (silent) - no guessing error names */
+      /* NO MICROPHONE on this machine - the message still gets made (silent), like WhatsApp would */
+      silentRec = true; recStart = Date.now();
+      $("recBtn").classList.add("rec"); $("recLbl").textContent = "Stop";
+      $("recTime").textContent = "0:00";
+      recTimer = setInterval(function(){ $("recTime").textContent = fmtDur(Date.now()-recStart); }, 500);
+      $("lvlWrap").style.display = "flex"; $("lvlWrap").classList.add("listening");
+      $("interim").textContent = "🔴 No microphone found — still recording the message (silent). Tap Stop when done.";
+      return;
+    }
+    aiCard(m === "NotAllowedError" ? "🎤 Microphone is BLOCKED" : "🎤 Mic unavailable",
+      m === "NotAllowedError"
+        ? "Tap the 🔒 icon next to the address bar → Microphone → Allow, then reload."
+        : "Technical: " + m + "\nFallbacks: upload a voice note (📎) or type. Details in 🩺 Diagnostics.", 0, "err");
+  });
+}
+function stopRec(){
+  if(silentRec){
+    silentRec = false;
+    clearInterval(recTimer);
+    $("recBtn").classList.remove("rec"); $("recLbl").textContent = "Record";
+    $("recTime").textContent = "0:00";
+    $("lvlWrap").classList.remove("listening"); stopMeter();
+    var sDur = Date.now() - recStart;
+    if(sDur < 800){ toast("⚠ Too short — hold for a second"); return; }
+    var sfr = new FileReader();
+    sfr.onload = function(){
+      currentAudio = {dataUrl: sfr.result, mime: "audio/wav", name: "rec", source: "rec", silent: true};
+      updateAttach();
+      $("attLbl").textContent = "🎙 " + fmtDur(sDur) + " — tap ▶ to play (no mic: silent)";
+      toast("🎙 Voice message saved (" + fmtDur(sDur) + ", silent — no mic on this device)");
+      lastNote = saveVoiceNote(currentAudio, sDur);
+      setEmptyTranscript();
+    };
+    sfr.readAsDataURL(makeSilenceBlob(sDur));
+    return;
+  }
+  if(srOnly){
+    try{ if(srOnly.stop) srOnly.stop(); }catch(e){}
+    srOnly = null;
+    $("lvlWrap").classList.remove("listening");
+    stopMeter();
+    clearInterval(recTimer);
+    $("recBtn").classList.remove("rec"); $("recLbl").textContent = "Record";
+    $("recTime").textContent = "0:00";
+    if(mediaRec){
+      /* recorder's onstop finishes everything: transcript + audio + pipeline */
+      try{ mediaRec.stop(); }catch(e){ micState(noWordsCard); }
+      mediaRec = null;
+    } else {
+      var txt = (recLiveText || srAcc || "").trim();
+      if(!txt){ micState(noWordsCard); return; }
+      finalizePipeline({ transcript: txt, reminders: splitReminders(txt) }, "rule");
+    }
+    return;
+  }
+  if(mediaRec){
+    if(mediaRec._rec){ try{ mediaRec._rec.stop(); }catch(e){} }
+    var wDur = Date.now() - recStart, wCount = noteSaveCount;
+    try{ mediaRec.stop(); }catch(e){}
+    mediaRec = null;
+    /* watchdog: if nothing landed in 1.6s, rescue the message */
+    setTimeout(function(){ if(noteSaveCount === wCount && wDur > 500) rescueNote(wDur); }, 1600);
+  }
+  stopMeter();
+  clearInterval(recTimer);
+  $("recBtn").classList.remove("rec"); $("recLbl").textContent = "Record";
+  $("recTime").textContent = "0:00";
+}
+$("recBtn").onclick = function(){ mediaRec ? stopRec() : startRec(); };
+
+/* ============ upload ============ */
+$("fileIn").onchange = function(){
+  var f = this.files && this.files[0]; if(!f) return;
+  if(f.size > 25*1024*1024){ toast("⚠ file > 25MB"); this.value=""; return; }
+  var fr = new FileReader();
+  fr.onload = function(){
+    currentAudio = {dataUrl: fr.result, mime: f.type || "audio/ogg", name: f.name, source:"up"};
+    updateAttach();
+    $("attLbl").textContent = "📎 " + f.name + " — tap ▶ to play";
+    lastNote = saveVoiceNote(currentAudio, 0);
+    blobSilent(f, function(sil){ sil ? setEmptyTranscript() : transcribeAudio(); });
+  };
+  fr.readAsDataURL(f);
+  this.value = "";
+};
+$("attClear").onclick = function(){
+  currentAudio = null; updateAttach();
+  $("playTryChip").style.display="none";
+};
+function updateAttach(){
+  var box = $("attBox"), au = $("attAudio");
+  if(currentAudio){
+    box.classList.add("show");
+    au.src = currentAudio.dataUrl;
+    $("attLbl").textContent = (currentAudio.source==="rec" ? "🎙 your recording" : "📎 " + currentAudio.name) + " ▶";
+    $("transChip").style.display = "";
+  } else { box.classList.remove("show"); au.removeAttribute("src"); $("transChip").style.display="none"; }
+}
+
+/* ============ AI: whisper in-browser, visible progress, exact errors ============ */
+var CDNS = [
+  { url: "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3", v3: true },
+  { url: "https://esm.sh/@huggingface/transformers@3", v3: true },
+  { url: "https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2", v3: false }
+];
+var pipePromise = null, pipeModel = null, libV3 = true;
+var MODELS = {
+  tiny:  { id: "Xenova/whisper-tiny",  label: "Tiny" },
+  base:  { id: "Xenova/whisper-base",  label: "Base" },
+  small: { id: "Xenova/whisper-small", label: "Small" }
+};
+var HINT = "Fallbacks: paste text manually, or play-aloud. Tip: an https link (free hosting) makes AI load reliably.";
+var AQ_FIX = "New AQ. keys from AI Studio are being rejected by Google's classic API (401) - a known migration issue, not your fault.\n" +
+  "FIX 1 (best): use the key that already works on your PC - reveal it with the 👁 button next to the key box, copy it, send it to your phone, paste here.\n" +
+  "FIX 2: create a classic key in Google Cloud Console: console.cloud.google.com → enable \"Generative Language API\" → APIs & Services → Credentials → Create credentials → API key (starts with AIza…).";
+function aiCard(stage, sub, pct, state){
+  var card = $("aiCard");
+  card.style.display = "";
+  card.classList.toggle("aierr", state === "err");
+  card.classList.toggle("aiok", state === "ok");
+  $("aiStage").textContent = stage;
+  $("aiSub").textContent = sub || "";
+  $("aiBarI").style.width = (pct == null ? 0 : Math.max(0, Math.min(100, pct))) + "%";
+  $("aiRetry").style.display = (state === "err") ? "" : "none";
+}
+function aiCardHideIfDone(){
+  var card = $("aiCard");
+  if(card.classList.contains("aiok")) card.style.display = "none";
+}
+function withTimeout(p, ms, tag){
+  return Promise.race([
+    p,
+    new Promise(function(_, rej){ setTimeout(function(){ rej(new Error(tag)); }, ms); })
+  ]);
+}
+async function loadLib(){
+  var lastErr = null;
+  for(var i = 0; i < CDNS.length; i++){
+    try{
+      var mod = await withTimeout(import(CDNS[i].url), 45000, "cdn:timeout");
+      libV3 = CDNS[i].v3;
+      try{
+        mod.env.allowLocalModels = false;
+        if(mod.env.backends && mod.env.backends.onnx && mod.env.backends.onnx.wasm){
+          mod.env.backends.onnx.wasm.numThreads = 1;
+        }
+      }catch(e){}
+      return mod;
+    }catch(e){ lastErr = e; }
+  }
+  throw new Error("cdn:all " + (lastErr ? (lastErr.message || "") : ""));
+}
+function makeProgCb(){
+  var files = {};
+  return function(item){
+    try{
+      if(item && item.status === "progress" && item.total){
+        files[item.file] = item.loaded / item.total;
+      } else if(item && (item.status === "done" || item.status === "ready") && item.file){
+        files[item.file] = 1;
+      }
+      var sum = 0, n = 0;
+      for(var k in files){ sum += files[k]; n++; }
+      if(n) aiCard("⏳ Downloading " + MODELS[modelPref].label + " model", "first time only — then cached & offline", Math.round((sum / n) * 100));
+    }catch(e){}
+  };
+}
+async function getPipe(onProgress){
+  if(pipePromise && pipeModel === modelPref) return pipePromise;
+  pipePromise = (async function(){
+    var mod = await loadLib();
+    var opts = { progress_callback: onProgress };
+    if(libV3) opts.dtype = "q8"; else opts.quantized = true;
+    return await mod.pipeline("automatic-speech-recognition", MODELS[modelPref].id, opts);
+  })();
+  pipeModel = modelPref;
+  return pipePromise;
+}
+document.querySelectorAll(".chip.model").forEach(function(ch){
+  ch.classList.toggle("on", ch.getAttribute("data-model") === modelPref);
+  ch.onclick = function(){
+    modelPref = ch.getAttribute("data-model");
+    try{ localStorage.setItem(MODELKEY, modelPref); }catch(e){}
+    pipePromise = null;
+    document.querySelectorAll(".chip.model").forEach(function(x){ x.classList.toggle("on", x===ch); });
+    toast(MODELS[modelPref].label + " model selected");
+  };
+});
+document.querySelectorAll(".chip.vlang").forEach(function(ch){
+  ch.classList.toggle("on", ch.getAttribute("data-vlang") === vlang);
+  ch.onclick = function(){
+    vlang = ch.getAttribute("data-vlang");
+    try{ localStorage.setItem(VLANGKEY, vlang); }catch(e){}
+    document.querySelectorAll(".chip.vlang").forEach(function(x){ x.classList.toggle("on", x===ch); });
+  };
+});
+function dataUrlToArrayBuffer(dataUrl){
+  var b64 = dataUrl.split(",")[1];
+  var bin = atob(b64);
+  var buf = new Uint8Array(bin.length);
+  for(var i=0; i<bin.length; i++) buf[i] = bin.charCodeAt(i);
+  return buf.buffer;
+}
+function resampleToF32(input, from, to){
+  if(from === to || !input.length) return Float32Array.from(input);
+  var ratio = from / to, len = Math.max(1, Math.round(input.length / ratio));
+  var out = new Float32Array(len);
+  for(var i=0; i<len; i++){
+    var pos = i * ratio, idx = Math.floor(pos), frac = pos - idx;
+    var a = input[idx] || 0, b = input[idx+1] || 0;
+    out[i] = a + (b - a) * frac;
+  }
+  return out;
+}
+async function audioTo16kMono(dataUrl){
+  var AC = window.AudioContext || window.webkitAudioContext;
+  var ctx = null;
+  try{ ctx = new AC({ sampleRate: 16000 }); }
+  catch(e){ ctx = new AC(); }
+  var buf;
+  try{ buf = await ctx.decodeAudioData(dataUrlToArrayBuffer(dataUrl)); }
+  catch(e){ try{ ctx.close(); }catch(e2){} throw new Error("decode:fail"); }
+  var data;
+  if(buf.numberOfChannels > 1){
+    data = new Float32Array(buf.length);
+    for(var cch=0; cch<buf.numberOfChannels; cch++){
+      var chd = buf.getChannelData(cch);
+      for(var s=0; s<buf.length; s++) data[s] += chd[s] / buf.numberOfChannels;
+    }
+  } else {
+    data = Float32Array.from(buf.getChannelData(0));
+  }
+  var rate = buf.sampleRate, dur = buf.duration;
+  try{ ctx.close(); }catch(e){}
+  return { audio: resampleToF32(data, rate, 16000), duration: dur };
+}
+var transBusy = false;
+
+/* ---- engine UI ---- */
+function refreshEngineUI(){
+  var isG = (enginePref === "gemini");
+  document.querySelectorAll(".chip.engine").forEach(function(c){
+    c.classList.toggle("on", c.getAttribute("data-engine") === enginePref);
+  });
+  $("keyRow").style.display = (enginePref === "local") ? "none" : "";
+  var kf = $("geminiKey");
+  if(enginePref === "groq"){ kf.placeholder = "Paste your free Groq key (gsk_… — console.groq.com/keys)"; if(groqKey) kf.value = groqKey; }
+  else { kf.placeholder = "Paste your Gemini API key"; if(geminiKey) kf.value = geminiKey; }
+  $("modelRow").style.display = isG ? "none" : "";
+  $("modelHint").style.display = isG ? "none" : "";
+  $("vlangRow").style.display = "";   /* ALWAYS visible: wrong speech language = total silence */
+  if(geminiKey) $("geminiKey").value = geminiKey;
+}
+document.querySelectorAll(".chip.engine").forEach(function(ch){
+  ch.onclick = function(){
+    enginePref = ch.getAttribute("data-engine");
+    if(enginePref === "gemini" && !geminiKey){
+      toast("Paste your free Gemini key below (aistudio.google.com/apikey)");
+      setTimeout(function(){ try{ $("geminiKey").focus(); }catch(e){} }, 100);
+    }
+    try{ localStorage.setItem(ENGINEKEY, enginePref); }catch(e){}
+    refreshEngineUI();
+  };
+});
+$("keyEye").onclick = function(){
+  var f = $("geminiKey");
+  f.type = (f.type === "password") ? "text" : "password";
+};
+$("keySave").onclick = function(){
+  var kv = $("geminiKey").value.trim();
+  if(enginePref === "groq"){
+    groqKey = kv;
+    try{ localStorage.setItem(GQKEY, groqKey); }catch(e){}
+    refreshEngineUI();
+    if(!groqKey){ toast("Groq key cleared"); return; }
+    aiCard("🔑 Testing your Groq key…", "one tiny call to verify", null);
+    withTimeout(fetch("https://api.groq.com/openai/v1/models", { headers: { Authorization: "Bearer " + groqKey } }), 20000, "groq:test-timeout")
+      .then(function(r){ if(!r.ok) throw new Error("http " + r.status); return r.json(); })
+      .then(function(d){
+        aiCard("✓ Groq key works — mixed AR/EN recording ACTIVE", (d.data ? d.data.length : "?") + " models available. Record with 🎤 — speak ANY language mix.", 100, "ok");
+        setTimeout(aiCardHideIfDone, 5000);
+      })
+      .catch(function(e){
+        aiCard("⛔ Groq key test FAILED", String((e && e.message) || e).slice(0, 160) + "\n→ free key: console.groq.com/keys (email signup, no card). Key starts with gsk_", 0, "err");
+      });
+    return;
+  }
+  geminiKey = kv;
+  try{ localStorage.setItem(GKEY, geminiKey); }catch(e){}
+  if(geminiKey){ try{ localStorage.setItem(ENGINEKEY, "gemini"); }catch(e){} }
+  refreshEngineUI();
+  if(!geminiKey){ toast("Key cleared — Local engine"); return; }
+  aiCard("🔑 Testing your Gemini key…", "one tiny call to verify", null);
+  geminiAnalyzeText("Quick test: remind me to drink water in 30 seconds")
+    .then(function(){
+      aiCard("✓ Key works — Cloud engine ACTIVE", "answering model: " + (lastModelUsed || "?") + " — notes will be AI-summarized", 100, "ok");
+      setTimeout(aiCardHideIfDone, 4000);
+    })
+    .catch(function(e){
+      if(e && e.aqkey){ aiCard("⛔ Google rejected this AQ. key (known migration issue)", AQ_FIX, 0, "err"); return; }
+      aiCard("⛔ Key test FAILED", String((e && e.message) || e).slice(0, 180) + "\n→ get a key at aistudio.google.com/apikey or console.cloud.google.com (AIza… keys work reliably)", 0, "err");
+    });
+};
+function initAutoChip(){
+  var ch = $("autoChip");
+  ch.classList.toggle("on", autoOn);
+  ch.textContent = "🚀 Auto-pilot: " + (autoOn ? "ON" : "OFF");
+}
+$("autoChip").onclick = function(){
+  autoOn = !autoOn;
+  try{ localStorage.setItem(AUTOKEY2, autoOn ? "1" : "0"); }catch(e){}
+  initAutoChip();
+  toast(autoOn ? "🚀 Auto-pilot ON — record & walk away" : "Manual mode — you press Start");
+};
+
+/* ---- WAV encoder (16k mono float32 -> base64 wav) for Gemini ---- */
+function b64Wav16k(samples){
+  var buf = new ArrayBuffer(44 + samples.length * 2), v = new DataView(buf);
+  function ws(o, s){ for(var i=0;i<s.length;i++) v.setUint8(o+i, s.charCodeAt(i)); }
+  ws(0,"RIFF"); v.setUint32(4, 36 + samples.length*2, true); ws(8,"WAVE"); ws(12,"fmt ");
+  v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,16000,true); v.setUint32(28,32000,true); v.setUint16(32,2,true); v.setUint16(34,16,true);
+  ws(36,"data"); v.setUint32(40, samples.length*2, true);
+  for(var i=0;i<samples.length;i++){
+    var s = Math.max(-1, Math.min(1, samples[i]));
+    v.setInt16(44 + i*2, s < 0 ? s*0x8000 : s*0x7FFF, true);
+  }
+  var u8 = new Uint8Array(buf), bin = "", CH = 32768;
+  for(var j=0;j<u8.length;j+=CH) bin += String.fromCharCode.apply(null, u8.subarray(j, j+CH));
+  return btoa(bin);
+}
+
+/* ---- Gemini cloud: one call = transcribe + analyze + time extraction ---- */
+var GMODELS = ["gemini-3.5-flash", "gemini-3-flash", "gemini-flash-latest"];
+var gmodelIdx = 0;
+var GMODELKEY = "voiceAlarm_gmodel";
+var lastModelUsed = "";
+function getCachedModel(){ try{ return localStorage.getItem(GMODELKEY) || null; }catch(e){ return null; } }
+function setCachedModel(m){ try{ if(m){ localStorage.setItem(GMODELKEY, m); } else { localStorage.removeItem(GMODELKEY); } }catch(e){} }
+/* Ask Google which models THIS key can actually use - future-proof against deprecations */
+async function discoverModels(){
+  var authL = geminiAuth("https://generativelanguage.googleapis.com/v1beta/models?pageSize=100");
+  var resp = await withTimeout(fetch(authL.url, { headers: authL.headers }), 20000, "list:timeout");
+  if(!resp.ok) throw new Error("list:http " + resp.status);
+  var data = await resp.json();
+  var cands = [];
+  (data.models || []).forEach(function(m){
+    var name = String(m.name || "").replace(/^models\//, "");
+    var methods = m.supportedGenerationMethods || [];
+    if(methods.indexOf("generateContent") === -1) return;
+    if(!/flash/i.test(name)) return;
+    var ver = 0, vm = name.match(/gemini-(\d+(?:\.\d+)?)/);
+    if(vm) ver = parseFloat(vm[1]);
+    var score = ver * 10;
+    if(/flash-lite/i.test(name)) score -= 3;
+    if(/preview/i.test(name)) score -= 0.5;
+    if(/thinking/i.test(name)) score -= 1;
+    cands.push({ name: name, score: score });
+  });
+  cands.sort(function(a,b){ return b.score - a.score; });
+  return cands.map(function(c){ return c.name; });
+}
+function geminiPrompt(withAudio){
+  return "You process a personal voice note (" + (withAudio ? "audio attached" : "transcript below") +
+    "). It may be Arabic, English, or mixed. Current time is used for relative timing.\n" +
+    "Return ONLY minified JSON with these keys:\n" +
+    "\"transcript\": verbatim transcript of what was said (keep original language(s)),\n" +
+    "\"reminders\": array of 1-4 objects, one PER distinct reminder request — every explicit فكرني/remind me marker starts its own entry carrying only the note-part it belongs to; a single unmarked note = exactly one entry. Each object: {\"title\": core commitment 3-7 words in the note's language, \"bullets\": 1-5 rewritten clean points, \"delay_seconds\": per-entry seconds, \"quoted_time\": per-entry bool},\n" +
+    "\"bullets\": array of 1-5 REWRITTEN notes — never copy the speaker's sentences; compress each distinct thought to its essence (max ~10 words, imperative form: \"Send X\", \"Check Y\"); merge duplicates and related items into one; drop filler, hesitations, meta-talk about apps/processes/deadline talk that is not a task; keep the speaker's language; [] if the note is one simple thought,\n" +
+    "\"delay_seconds\": integer seconds from NOW until the reminder should ring, parsed from ANY time mention, including typos, half-words and Egyptian/colloquial Arabic: exact (\"at 9pm\", \"الساعة ٩ مسا\", \"tomorrow morning\") or fuzzy (\"in a bit/soon/then\"=300, \"بعد شوية/كمان شوية/شويتين\"=300, \"كمان خمساية/كمان خمسة\"=300, \"خمس دقايق كدا\"=300, \"in a couple of minutes\"=120, \"a few minutes\"=180, \"some minutes\"=600, \"half an hour\"=1800, \"نص ساعة\"=1800, \"later/بعدين\"=3600). IMPORTANT INTENT RULES: (1) count a time ONLY if the speaker PERSONALLY wants a reminder/plan/event at that time (first-person: فكرني، لازم، عندي، هعمل، I should, remind me, meeting at X). Time inside narrated/quoted speech (وهو قاللى اصبر كمان شوية، he told me to wait) → delay_seconds=null AND quoted_time=true. (2) EXCEPTION: if the speaker explicitly closes the note (or a part of it) with فكرني / ذكرني / remind me (e.g. ending with «فكرني بها»), that time IS intentional → set the real delay even if it was narrated. (3) Multiple فكرني/remind me markers = multiple reminders array entries, each with its own time." +
+    (withAudio ? "" : "\nTRANSCRIPT:\n");
+}
+function parseJsonLoose(s){
+  s = String(s).replace(/```json|```/g, "").trim();
+  try{ return JSON.parse(s); }catch(e){}
+  var m = s.match(/\{[\s\S]*\}/);
+  if(m){ try{ return JSON.parse(m[0]); }catch(e){} }
+  throw new Error("bad-json:" + s.slice(0, 120));
+}
+function geminiAuth(url, headers){
+  /* new AQ. keys are rejected as ?key= (401 ACCESS_TOKEN_TYPE_UNSUPPORTED) - pass them as header */
+  if(geminiKey.indexOf("AQ") === 0){
+    headers = headers || {};
+    headers["x-goog-api-key"] = geminiKey;
+    return { url: url, headers: headers };
+  }
+  return { url: url + (url.indexOf("?") >= 0 ? "&" : "?") + "key=" + encodeURIComponent(geminiKey), headers: headers || {} };
+}
+async function callGemini(promptText, audioB64, audioMime){
+  if(!geminiKey) throw new Error("nokey");
+  /* candidate models: cached winner, then ones discovered live for THIS key, then static chain */
+  var chain = [];
+  var cached = getCachedModel();
+  if(cached) chain.push(cached);
+  if(!cached){
+    try{
+      var found = await discoverModels();
+      found.forEach(function(m){ if(chain.indexOf(m) === -1) chain.push(m); });
+    }catch(e){ /* discovery is best-effort; static chain still applies */ }
+  }
+  GMODELS.forEach(function(m){ if(chain.indexOf(m) === -1) chain.push(m); });
+  if(!chain.length) chain = GMODELS.slice();
+  var lastErr = "";
+  for(var tries = 0; tries < chain.length; tries++){
+    var model = chain[tries];
+    var parts = [{ text: promptText }];
+    if(audioB64) parts.push({ inline_data: { mime_type: audioMime || "audio/wav", data: audioB64 } });
+    var body = { contents: [{ role: "user", parts: parts }], generationConfig: { temperature: 0.2, response_mime_type: "application/json" } };
+    try{
+      var auth = geminiAuth("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent");
+      auth.headers["Content-Type"] = "application/json";
+      var resp = await withTimeout(fetch(auth.url, { method: "POST", headers: auth.headers, body: JSON.stringify(body) }), 60000, "gemini:timeout");
+      if(!resp.ok){
+        var t = await resp.text();
+        var er = new Error("http " + resp.status + " " + t.slice(0, 140));
+        er.status = resp.status;
+        if(resp.status === 401 || t.indexOf("ACCESS_TOKEN_TYPE_UNSUPPORTED") >= 0) er.aqkey = true;
+        throw er;
+      }
+      var data = await resp.json();
+      var cand = (data.candidates || [])[0] || {};
+      var txt = (((cand.content || {}).parts || [])[0] || {}).text || "";
+      lastModelUsed = model;
+      setCachedModel(model);
+      return parseJsonLoose(txt);
+    }catch(e){
+      lastErr = String((e && e.message) || e);
+      var st = (e && e.status) || 0;
+      if(st === 400 || st === 401 || st === 403) throw new Error(lastErr);  /* key problem - no point trying others */
+      if(st === 404 && getCachedModel() === model) setCachedModel(null);    /* cached model retired - re-discover next time */
+      /* 404 (model gone) / 429 (quota) / 5xx: try the next model in the chain */
+    }
+  }
+  throw new Error("gemini:all " + lastErr);
+}
+function sanitizeAi(obj, fallbackText){
+  var transcript = String(obj && obj.transcript != null ? obj.transcript : (fallbackText || "")).trim();
+  var cl = collapseLoops(transcript);
+  var title = String(obj && obj.title != null ? obj.title : "").trim().slice(0, 90);
+  if(!title) title = transcript.split(/[.!؟\n]/)[0] || "(voice note)";
+  var bullets = [];
+  if(obj && Array.isArray(obj.bullets)){
+    obj.bullets.forEach(function(b){
+      b = String(b).trim();
+      if(b && b.length > 1) bullets.push(b.slice(0, 240));
+    });
+  }
+  if(!bullets.length){
+    var rule = organize(transcript);
+    bullets = rule.bullets;
+  }
+  var rems = [];
+  if(obj && Array.isArray(obj.reminders) && obj.reminders.length){
+    obj.reminders.forEach(function(r){
+      var sr = sanitizeRem(r);
+      if(!sr.title && !sr.bullets.length) return;
+      if(!sr.title) sr.title = title;
+      sr.whenText = sr.title + " " + sr.bullets.join(" ");
+      rems.push(sr);
+    });
+  }
+  if(!rems.length){
+    var d = (obj && obj.delay_seconds != null) ? Number(obj.delay_seconds) : NaN;
+    rems.push({
+      title: title, bullets: bullets.slice(0, 6),
+      delay: (isFinite(d) && d >= 0) ? Math.round(d) : null,
+      quoted: !!(obj && obj.quoted_time),
+      whenText: cl.text
+    });
+  }
+  return { transcript: cl.text, reminders: rems.slice(0, 4), cleaned: cl.cleaned };
+}
+var AGTKEY = "voiceAlarm_agents", agentsDeep = false;
+try{ agentsDeep = localStorage.getItem(AGTKEY) === "1"; }catch(e){}
+function initAgentsChip(){
+  var ch = $("agentsChip");
+  ch.classList.toggle("on", agentsDeep);
+  ch.textContent = agentsDeep ? "🤝 Agents: DEEP (2×AI)" : "🤝 Agents: FAST (1×AI)";
+}
+$("agentsChip").onclick = function(){
+  agentsDeep = !agentsDeep;
+  try{ localStorage.setItem(AGTKEY, agentsDeep ? "1" : "0"); }catch(e){}
+  initAgentsChip();
+  toast(agentsDeep ? "🤝 Deep mode: Transcriber → Organizer agents" : "⚡ Fast mode: one AI call");
+};
+function promptTranscribe(){
+  return "You are Agent 1 (Transcriber). Transcribe this voice note VERBATIM (Arabic, English or mixed — dialect and typos in speech are fine).\n" +
+    "Also extract \"delay_seconds\": seconds from NOW until any mentioned reminder time — including Egyptian colloquial and sloppy phrasing (كمان شوية=300, شويتين=300, كمان خمساية=300, بعد شوية=300, خمس دقايق كدا=300, الساعة ٩ مسا=until 9pm today/tomorrow, in a bit=300). Interpret intent, not dictionary words. Count a time ONLY for the speaker's OWN commitments; time inside quoted speech (وهو قاللى اصبر كمان شوية / he told me to wait) → delay_seconds=null and quoted_time=true.\n" +
+    "Return ONLY minified JSON: {\"transcript\":\"…\", \"delay_seconds\":number|null, \"quoted_time\":boolean}";
+}
+function promptOrganize(transcript){
+  return "You are Agent 2 (Organizer). Here is a verbatim transcript of a personal voice note:\n" + transcript + "\n" +
+    "Produce clean notes and re-check the times. Return ONLY minified JSON:\n" +
+    "\"reminders\": array of 1-4 objects, one per explicit فكرني/remind me marker (single unmarked note = one entry). Each: {\"title\": 3-7 words same language, \"bullets\": 1-5 REWRITTEN points (never copy sentences; max ~10 words; imperative; merge duplicates; drop filler), \"delay_seconds\": seconds from NOW from colloquial/typo mentions in THAT entry's part only (كمان شوية=300, شويتين=300, كمان خمساية=300, in a bit=300); quoted/narrated time → null + quoted_time:true — UNLESS the speaker explicitly closes with فكرني/remind me, then it is intentional and gets the real delay}.";
+}
+function sanitizeRem(r){
+  var title = String(r && r.title != null ? r.title : "").trim().slice(0, 90);
+  var bullets = [];
+  if(r && Array.isArray(r.bullets)){
+    r.bullets.forEach(function(b){ b = String(b).trim(); if(b && b.length > 1) bullets.push(b.slice(0, 240)); });
+  }
+  var d = (r && r.delay_seconds != null) ? Number(r.delay_seconds) : NaN;
+  return {
+    title: title, bullets: bullets.slice(0, 6),
+    delay: (isFinite(d) && d >= 0) ? Math.round(d) : null,
+    quoted: !!(r && r.quoted_time)
+  };
+}
+async function groqTranscribe(dataUrl){
+  aiCard("🌐 Groq Whisper: transcribing your recording…", "mixed Arabic/English handled natively — seconds", null);
+  var mime = (currentAudio && currentAudio.mime) || "audio/webm";
+  var ext = /ogg/.test(mime) ? "ogg" : (/mp4/.test(mime) ? "m4a" : (/wav/.test(mime) ? "wav" : "webm"));
+  var blob = new Blob([dataUrlToArrayBuffer(dataUrl)], { type: mime });
+  var fd = new FormData();
+  fd.append("file", new File([blob], "note." + ext, { type: mime }));
+  fd.append("model", "whisper-large-v3-turbo");
+  fd.append("response_format", "json");
+  fd.append("temperature", "0");
+  var resp = await withTimeout(fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
+    method: "POST", headers: { Authorization: "Bearer " + groqKey }, body: fd
+  }), 60000, "groq:timeout");
+  if(!resp.ok){
+    var t = await resp.text();
+    var er = new Error("http " + resp.status + " " + t.slice(0, 140));
+    er.status = resp.status;
+    throw er;
+  }
+  var data = await resp.json();
+  var text = String(data.text || "").trim();
+  var cl = collapseLoops(text);
+  text = cl.text;
+  if(!text) throw new Error("empty-transcript");
+  if(geminiKey){
+    try{
+      var ai = await geminiAnalyzeText(text);
+      finalizePipeline(ai, "groq+ai");
+      return;
+    }catch(e){}
+  }
+  if(groqKey){
+    /* free Llama LLM on the SAME key: analyzing/parsing/organizing, like a chat model */
+    try{
+      var ai2 = await groqAnalyzeText(text);
+      finalizePipeline(ai2, "groq+ai");
+      return;
+    }catch(e){ aiCard("⚠ Llama organize failed — using built-in organizer", String(e.message || e).slice(0, 120)); }
+  }
+  finalizePipeline({ transcript: text, reminders: splitReminders(text), cleaned: cl.cleaned }, "groq");
+  aiCard("✓ Groq done" + (cl.cleaned ? " · repetition cleaned" : ""), "", 100, "ok");
+  setTimeout(aiCardHideIfDone, 4000);
+}
+async function geminiDirect(dataUrl){
+  aiCard("🎵 Preparing your recording…", "", null);
+  var prep = await audioTo16kMono(dataUrl);
+  var wav = b64Wav16k(prep.audio);
+  var obj;
+  if(agentsDeep){
+    /* Agent 1: listen (audio) — Agent 2: think (text) */
+    aiCard("🤝 Agent 1/2: Transcriber listening…", "cloud, seconds", null);
+    var a = await callGemini(promptTranscribe(), wav, "audio/wav");
+    aiCard("🤝 Agent 2/2: Organizer thinking…", "reviewing transcript + re-checking time", null);
+    var t = String(a && a.transcript || "");
+    var b = await callGemini(promptOrganize(t), null, null);
+    obj = { transcript: t,
+            reminders: (b && Array.isArray(b.reminders) && b.reminders.length) ? b.reminders
+              : [{ title: b && b.title, bullets: b && b.bullets, delay_seconds: (b && b.delay_seconds != null) ? b.delay_seconds : (a && a.delay_seconds), quoted_time: !!(b && b.quoted_time) || !!(a && a.quoted_time) }] };
+  } else {
+    aiCard("🌐 Gemini: transcribing + analyzing…", "one fast call", null);
+    obj = await callGemini(geminiPrompt(true), wav, "audio/wav");
+  }
+  var ai = sanitizeAi(obj, "");
+  aiCard("✓ Cloud AI done" + (agentsDeep ? " (2 agents)" : "") + (ai.cleaned ? " · repetition cleaned" : ""), "", 100, "ok");
+  finalizePipeline(ai, "gemini");
+}
+async function geminiAnalyzeText(text){
+  var obj = await callGemini(geminiPrompt(false) + text, null, null);
+  return sanitizeAi(obj, text);
+}
+
+/* ---- local whisper pipeline (offline) ---- */
+async function localWhisper(dataUrl){
+  aiCard("🔌 Loading AI library…", "connecting to CDN…", null);
+  var pipe = await getPipe(makeProgCb());
+  aiCard("🎵 Preparing audio…", "", null);
+  var prep = await audioTo16kMono(dataUrl);
+  var langNote = vlang === "auto" ? "auto-detect" : (vlang === "ar" ? "Arabic" : "English");
+  var t0 = Date.now(), timer = null;
+  timer = setInterval(function(){
+    aiCard("🧠 Transcribing (" + langNote + ") — " + fmtDur(Date.now() - t0), MODELS[modelPref].label + " model — local CPU, slower but offline", null);
+  }, 500);
+  var opts = { task: "transcribe", no_repeat_ngram_size: 3 };
+  if(libV3){ if(vlang !== "auto") opts.language = vlang; }
+  else { if(vlang !== "auto") opts.language = (vlang === "ar" ? "arabic" : "english"); }
+  if(prep.duration > 25){ opts.chunk_length_s = 30; opts.stride_length_s = 5; }
+  var out;
+  try{ out = await pipe(prep.audio, opts); }
+  catch(e1){
+    delete opts.no_repeat_ngram_size;
+    out = await pipe(prep.audio, opts);
+  }
+  clearInterval(timer); timer = null;
+  var text = (out && out.text ? String(out.text) : "").trim();
+  var cl = collapseLoops(text);
+  text = cl.text;
+  if(!text) throw new Error("empty-transcript");
+  aiCard("✓ Transcribed (local)" + (cl.cleaned ? " · repetition loop cleaned" : ""), geminiKey ? "organizing with Gemini…" : "", 100, "ok");
+  if(geminiKey){
+    try{
+      var ai = await geminiAnalyzeText(text);
+      finalizePipeline(ai, "localai");
+      return;
+    }catch(e){ aiCard("⚠ Gemini organize failed — using built-in organizer", String(e.message || e).slice(0, 140)); }
+  }
+  if(groqKey){
+    try{
+      var ai2 = await groqAnalyzeText(text);
+      finalizePipeline(ai2, "localai");
+      return;
+    }catch(e){ aiCard("⚠ Llama organize failed — using built-in organizer", String(e.message || e).slice(0, 120)); }
+  }
+  var rems = splitReminders(text);
+  finalizePipeline({ transcript: text, reminders: rems, cleaned: cl.cleaned }, "rule");
+}
+
+/* ---- finalize: organize fields + AUTO-PILOT (start countdown automatically) ---- */
+var SRC_LABEL = { gemini:"🌐 Gemini (cloud AI)", localai:"💻 local audio + 🌐 AI notes", groq:"🌐 Groq Whisper (mixed AR/EN)", "groq+ai":"🌐 Groq STT + 🤖 Llama AI (free)", rule:"✂️ basic splitter — add a free Groq/Gemini key for AI notes" };
+function finalizePipeline(ai, srcTag){
+  try{
+    if(lastNote && ai && ai.transcript){
+      lastNote.transcript = String(ai.transcript);
+      try{ localStorage.setItem(NOTESKEY, JSON.stringify(vnotes)); }catch(e){}
+      renderNotes();
+    }
+  }catch(e){}
+  $("orgBadge").textContent = SRC_LABEL[srcTag] || "";
+  $("taskText").value = ai.transcript;
+  var rems = (ai.reminders && ai.reminders.length) ? ai.reminders
+    : [{ title: ai.title, bullets: ai.bullets, delay: ai.delay, quoted: ai.quoted, whenText: ai.transcript }];
+  $("orgTitle").value = rems[0].title;
+  $("orgBullets").value = rems[0].bullets.join("\n");
+  $("orgCard").classList.add("show");
+  orgTouched = false;
+  $("interim").innerHTML = "<span class='got'>" + esc(ai.transcript.slice(0, 140)) + (ai.transcript.length > 140 ? "…" : "") + "</span>";
+  updateTimeStatus();
+  if(!autoOn){
+    $("orgCard").scrollIntoView({behavior:"smooth", block:"nearest"});
+    setTimeout(aiCardHideIfDone, 8000);
+    return;   /* manual mode: user reviews and presses Start */
+  }
+  /* AUTO-PILOT: per-reminder countdowns, zero taps. Explicit trailing فكرني/remind me overrides narration doubts */
+  var explicitTail = explicitTailCheck(ai.transcript);
+  var made = 0, firstHow = "";
+  rems.forEach(function(r){
+    var dueAt, auto3s = false, how;
+    var w = parseWhen(r.whenText || (r.title + " " + r.bullets.join(" ")), {ignoreNarration: explicitTail});
+    if(r.delay != null){ dueAt = Date.now() + r.delay * 1000; how = "AI time"; }
+    else if(w){ dueAt = w.dueAt; how = explicitTail ? "confirmed by فكرني" : "detected in text"; }
+    else { dueAt = Date.now() + 3000; auto3s = true; how = "no time → 3s"; }
+    addTask(r.title, r.bullets.join("\n"), dueAt, made === 0 ? currentAudio : null, {auto3s: auto3s, spaced: spacedOn});
+    if(made === 0) firstHow = how + ": alarm in " + fmtDur(dueAt - Date.now());
+    made++;
+  });
+  toast("🚀 Auto-started " + made + " reminder" + (made > 1 ? "s" : "") + " (" + firstHow + ")");
+  currentAudio = null; manualDue = null; spacedOn = false;
+  $("spacedChip").classList.remove("on");
+  updateAttach(); updateChip();
+  $("taskText").value = "";
+  $("orgCard").classList.remove("show"); orgTouched = false;
+  $("aiCard").style.display = "none";
+  $("playTryChip").style.display = "none";
+}
+
+/* ---- dispatcher ---- */
+async function transcribeAudio(){
+  if(!currentAudio){ return; }
+  if(transBusy) return;
+  transBusy = true;
+  try{
+    if(enginePref === "groq" && groqKey){
+      try{ await groqTranscribe(currentAudio.dataUrl); }
+      catch(e){
+        if(IS_MOBILE){
+          aiCard("⛔ Groq failed", String((e && e.message) || e).slice(0, 160) + "\n→ check key/internet and tap Retry.", 0, "err");
+          return;
+        }
+        aiCard("⚠ Groq failed — trying local engine…", String((e && e.message) || e).slice(0, 160));
+        await localWhisper(currentAudio.dataUrl);
+      }
+    } else if(enginePref === "gemini" && geminiKey){
+      try{ await geminiDirect(currentAudio.dataUrl); }
+      catch(e){
+        if(e && e.aqkey){
+          aiCard("⛔ Google rejected this AQ. key (known migration issue)", AQ_FIX, 0, "err");
+          return;
+        }
+        if(IS_MOBILE){
+          aiCard("⛔ Cloud failed on mobile", String((e && e.message) || e).slice(0, 160) + "\n→ check the key/internet and tap Retry. (Local engine on mobile needs a ~250 MB download - switch to it deliberately, not as a surprise.)", 0, "err");
+          return;
+        }
+        aiCard("⚠ Cloud failed — falling back to local engine…", String((e && e.message) || e).slice(0, 180));
+        await localWhisper(currentAudio.dataUrl);
+      }
+    } else if(enginePref === "local") {
+      await localWhisper(currentAudio.dataUrl);
+    } else {
+      aiCard("✓ Recording saved (player above) — now choose transcription",
+        "⭐ BEST FREE: Groq — free key at console.groq.com/keys (email, no card) → mixed Arabic/English recording, seconds\n" +
+        "• Gemini key: console.cloud.google.com → Generative Language API → Credentials\n" +
+        "• 💻 Local engine: deliberate one-time model download\n" +
+        "• On phone without any key: 🎤 still gives live one-language dictation (set 🎙 SPEECH LANGUAGE)", null);
+      return;
+    }
+  }catch(err){
+    var msg = String((err && err.message) || err || "");
+    var stage;
+    if(msg.indexOf("cdn:") === 0){ stage = "⛔ Can't reach the AI library"; }
+    else if(msg.indexOf("decode:") === 0){ stage = "⛔ This browser can't decode that audio format"; }
+    else if(msg.indexOf("http 4") === 0){ stage = "⛔ Gemini API problem (check key/quota)"; }
+    else if(msg === "empty-transcript"){ setEmptyTranscript(); $("playTryChip").style.display = ""; return; }
+    else { stage = "⛔ Transcription failed"; }
+    aiCard(stage, HINT + "\nTechnical: " + msg.slice(0, 220), 0, "err");
+    $("playTryChip").style.display = "";
+  }
+  transBusy = false;
+}
+$("transChip").onclick = function(){ ensureCtx(); transcribeAudio(); };
+$("aiRetry").onclick = function(){ pipePromise = null; transcribeAudio(); };
+
+/* ---- play-aloud fallback ---- */
+$("playTryChip").onclick = function(){
+  if(!currentAudio){ return; }
+  var au = new Audio(currentAudio.dataUrl);
+  var r = startRecognition(
+    function(all){ $("interim").innerHTML = "<span class='got'>" + esc(all) + "</span>"; },
+    function(all){
+      if(all.trim()){
+        $("taskText").value = all.trim();
+        updateChip(); updateTimeStatus(); fillOrganized(true);
+      }
+    },
+    function(){ toast("Play-aloud failed — type or paste the text"); }
+  );
+  if(!r) return;
+  ensureCtx();
+  r.start();
+  au.onended = function(){ try{ r.stop(); }catch(e){} };
+  au.play().catch(function(){ try{ r.stop(); }catch(e){} toast("⚠ cannot play"); });
+};
+
+/* ============ auto-organize ============ */
+var orgTimer = null;
+function fillOrganized(force){
+  if(orgTouched && !force) return;
+  var text = $("taskText").value.trim();
+  if(!text){ $("orgCard").classList.remove("show"); return; }
+  var org = organize(text);
+  $("orgTitle").value = org.title;
+  $("orgBullets").value = org.bullets.join("\n");
+  $("orgCard").classList.add("show");
+}
+function scheduleAutoOrganize(){
+  clearTimeout(orgTimer);
+  orgTimer = setTimeout(function(){ fillOrganized(false); }, 1200);
+}
+$("taskText").addEventListener("input", function(){
+  updateTimeStatus();
+  if(!orgTouched) scheduleAutoOrganize();
+  if(!$("taskText").value.trim()){ $("orgCard").classList.remove("show"); orgTouched = false; }
+});
+$("orgTitle").addEventListener("input", function(){ orgTouched = true; });
+$("orgBullets").addEventListener("input", function(){ orgTouched = true; });
+$("orgRedo").onclick = function(){ orgTouched = false; fillOrganized(true); orgTouched = false; };
+
+/* ============ voice notes library (the answer to "saved where?") ============ */
+var NOTESKEY = "voiceAlarm_notes_v1";
+var vnotes = [];
+try{ vnotes = JSON.parse(localStorage.getItem(NOTESKEY) || "[]"); }catch(e){ vnotes = []; }
+var noteSaveCount = 0, lastNote = null;
+var EMPTY_TXT = "(the voice note is empty)";
+function setEmptyTranscript(){
+  if(lastNote){ lastNote.transcript = EMPTY_TXT;
+    try{ localStorage.setItem(NOTESKEY, JSON.stringify(vnotes)); }catch(e){}
+    renderNotes();
+  }
+  $("interim").textContent = "Transcript: " + EMPTY_TXT;
+  toast("📝 " + EMPTY_TXT);
+}
+function blobSilent(blob, cb){
+  /* physics check before wasting an API call: is there any sound at all? */
+  try{
+    blob.arrayBuffer().then(function(ab){
+      ensureCtx().decodeAudioData(ab, function(buf){
+        var ch = buf.getChannelData(0), sum = 0, n = Math.min(ch.length, buf.sampleRate * 30);
+        for(var i = 0; i < n; i++){ sum += ch[i] * ch[i]; }
+        cb(Math.sqrt(sum / Math.max(1, n)) < 0.004);   /* ~silence threshold */
+      }, function(){ cb(false); });
+    }).catch(function(){ cb(false); });
+  }catch(e){ cb(false); }
+}
+async function groqAnalyzeText(text){
+  /* free LLM on the SAME gsk_ key: turns transcript into organized reminder JSON */
+  var resp = await withTimeout(fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: { "Authorization": "Bearer " + groqKey, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "llama-3.1-8b-instant",
+      temperature: 0,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: "You turn Arabic/English/mixed voice-note transcripts into reminder JSON. Reply with ONLY minified JSON." },
+        { role: "user", content: geminiPrompt(false) + text }
+      ]
+    })
+  }), 45000, "groq-llm:timeout");
+  if(!resp.ok) throw new Error("http " + resp.status + " " + (await resp.text()).slice(0, 120));
+  var data = await resp.json();
+  var raw = String((data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "");
+  return sanitizeAi(JSON.parse(raw), text);
+}
+function rescueNote(durMs){
+  /* last-resort: if the recorder pipeline died, still manufacture the message */
+  var fr = new FileReader();
+  fr.onload = function(){
+    saveVoiceNote({ dataUrl: fr.result, mime: "audio/wav", name: "rec", source: "rec", silent: true }, durMs);
+    toast("🎙 Note saved via fail-safe (" + fmtDur(durMs) + ")");
+  };
+  fr.readAsDataURL(makeSilenceBlob(durMs || 1000));
+}
+function saveVoiceNote(a, durMs){
+  if(!a || !a.dataUrl) return;
+  noteSaveCount++;
+  vnotes.unshift({ id: "n" + Date.now() + Math.floor(Math.random()*99), dataUrl: a.dataUrl, mime: a.mime || "audio/webm",
+                   name: a.name || "rec", dur: durMs || 0, ts: Date.now(), source: a.source || "rec", silent: !!a.silent });
+  var payload = JSON.stringify(vnotes);
+  while(payload.length > 4200000 && vnotes.length > 1){ vnotes.pop(); payload = JSON.stringify(vnotes); }
+  try{ localStorage.setItem(NOTESKEY, payload); }catch(e){}
+  renderNotes();
+  return vnotes[0];
+}
+function renderNotes(){
+  var host = $("notesList");
+  if(!vnotes.length){
+    host.innerHTML = "<div class='empty'>Nothing yet — every recording (mic, upload, even silent test notes) lands here permanently. Play them anytime.</div>";
+    return;
+  }
+  host.innerHTML = vnotes.map(function(n){
+    var label = (n.source === "up" ? "📎 " : "🎙 ") +
+      (n.dur ? fmtDur(n.dur) : n.name) + (n.silent ? " (silent)" : "") +
+      " · " + new Date(n.ts).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+    return "<div class='dayItem' style='margin-bottom:8px'>" +
+      "<div class='row' style='justify-content:space-between'><div class='dm' style='margin:0'>" + esc(label) + "</div>" +
+      "<div class='row'>" +
+        "<button class='x' data-nuse='" + n.id + "'>🤖</button>" +
+        "<button class='x' data-ndel='" + n.id + "'>✖</button>" +
+      "</div></div>" +
+      "<audio controls preload='none' src='" + n.dataUrl + "' style='width:100%;height:36px;margin-top:6px'></audio>" +
+      (n.transcript ? "<div class='dm' style='margin:6px 0 0;white-space:pre-wrap'>" +
+        (n.transcript === EMPTY_TXT ? "<i>" + esc(n.transcript) + "</i>" : "📝 " + esc(n.transcript.slice(0, 400))) + "</div>" : "") +
+    "</div>";
+  }).join("");
+  host.querySelectorAll("[data-ndel]").forEach(function(b){
+    b.onclick = function(){ vnotes = vnotes.filter(function(x){ return x.id !== b.getAttribute("data-ndel"); });
+      try{ localStorage.setItem(NOTESKEY, JSON.stringify(vnotes)); }catch(e){}
+      renderNotes(); };
+  });
+  host.querySelectorAll("[data-nuse]").forEach(function(b){
+    b.onclick = function(){
+      var n = null;
+      vnotes.forEach(function(x){ if(x.id === b.getAttribute("data-nuse")) n = x; });
+      if(!n) return;
+      currentAudio = { dataUrl: n.dataUrl, mime: n.mime, name: n.name, source: n.source };
+      updateAttach();
+      document.querySelector(".card").scrollIntoView({behavior:"smooth"});
+      transcribeAudio();
+    };
+  });
+}
+
+/* ============ time status line ============ */
+function updateTimeStatus(){
+  var el = $("timeStatus"), text = $("taskText").value.trim();
+  if(!text){ el.textContent = ""; el.className = "tstat"; return; }
+  var when = parseWhen(text);
+  if(when){
+    el.textContent = "⏱ Time detected: " + fmtClock(when.dueAt) + "  (in " + fmtDur(when.dueAt - Date.now()) + ")";
+    el.className = "tstat on";
+  } else if(manualDue){
+    el.textContent = "⏱ " + fmtClock(manualDue) + "  (in " + fmtDur(manualDue - Date.now()) + ")";
+    el.className = "tstat on";
+  } else {
+    el.textContent = "⚡ No time found → alarm in 3 seconds with your organized notes";
+    el.className = "tstat def";
+  }
+}
+
+/* ============ tasks ============ */
+var ringQueue = [], ringing = null, ringStartedAt = 0, ringCapTimer = null;
+function addTask(title, notes, dueAt, audio, opts){
+  opts = opts || {};
+  tasks.push({
+    id: "t" + Date.now() + Math.floor(Math.random()*999),
+    title: title || "(…)", notes: notes || "", dueAt: dueAt,
+    createdAt: Date.now(), audio: audio || null,
+    overdue:false, _fired:false,
+    auto3s: !!opts.auto3s, spaced: !!opts.spaced, round: 0
+  });
+  save(); render(); refreshViews();
+}
+function delTask(id){
+  if(ringing && ringing.id === id){ dismissRing(); return; }
+  var moved = null;
+  tasks = tasks.filter(function(x){ if(x.id === id){ moved = x; return false; } return true; });
+  if(moved) pushToHistory(moved);
+  save(); render();
+}
+function render(){
+  var host = $("list");
+  if(!tasks.length){ host.innerHTML = "<div class='empty'>Nothing yet — record or upload a voice note ↑</div>"; return; }
+  var sorted = tasks.slice().sort(function(a,b){ return a.dueAt - b.dueAt; });
+  host.innerHTML = sorted.map(function(tk){
+    var audioTag = tk.audio
+      ? "<audio controls preload='none' src='" + tk.audio.dataUrl + "'></audio>"
+      : "";
+    var pct = tk.dueAt > tk.createdAt ? Math.min(100, Math.max(0, (Date.now()-tk.createdAt)/(tk.dueAt-tk.createdAt)*100)) : 100;
+    var badges =
+      (tk.auto3s ? "<span class='badge'>⚡3s</span>" : "") +
+      (tk.spaced ? "<span class='badge'>🔁" + (tk.round > 0 ? " ×" + tk.round : "") + "</span>" : "");
+    var notesHtml = tk.notes
+      ? "<div class='n' dir='auto'>" + esc(tk.notes).replace(/\n/g, "\n• ") + "</div>"
+      : "";
+    return "<div class='task" + (tk.overdue ? " overdue" : "") + "' data-id='" + tk.id + "'>" +
+      "<div class='t' dir='auto'>" + esc(tk.title) + badges + "</div>" +
+      notesHtml +
+      "<div class='bar'><i style='width:" + pct + "%'></i></div>" +
+      "<div class='foot'>" +
+        "<div><div class='cd' data-cd='" + tk.id + "'>–:––</div><div class='due' data-due='" + tk.id + "'></div></div>" +
+        "<div class='row'>" + audioTag + "<button class='x' data-del='" + tk.id + "'>✖ cancel</button></div>" +
+      "</div></div>";
+  }).join("");
+  host.querySelectorAll("[data-del]").forEach(function(b){
+    b.onclick = function(){ delTask(b.getAttribute("data-del")); };
+  });
+  tick();
+}
+function tick(){
+  var now = Date.now();
+  var due = null;
+  tasks.forEach(function(tk){
+    var left = tk.dueAt - now;
+    document.querySelectorAll("[data-cd='" + tk.id + "']").forEach(function(el){ el.textContent = fmtDur(left); });
+    var dueEl = document.querySelector("[data-due='" + tk.id + "']");
+    if(dueEl) dueEl.textContent = (left < 0 ? "⚠ " : "🕘 ") + fmtClock(tk.dueAt) + (tk.overdue ? " · missed while away — ringing now" : "");
+    if(left <= 0 && !tk._fired){ tk._fired = true; due = tk; }
+  });
+  if(due && !ringing){ queueRing(due); }
+  if(ringing && Date.now() - ringStartedAt > 180000){ stopRing(); }
+}
+setInterval(tick, 400);
+
+/* ============ ringing ============ */
+function queueRing(tk){
+  ringQueue.push(tk);
+  if(!ringing) nextRing();
+}
+function nextRing(){
+  ringing = ringQueue.shift() || null;
+  var ov = $("overlay");
+  if(!ringing){ ov.classList.remove("show"); stopRing(); stopVibrate(); document.title = "Voice Alarm"; return; }
+  $("ovTitle").textContent = ringing.title;
+  $("ovNotes").innerHTML = (ringing.notes || "").split("\n").filter(Boolean)
+    .map(function(l){ return "<div>▸ " + esc(l) + "</div>"; }).join("");
+  $("ovRing").textContent = "⏰ " + fmtClock(ringing.dueAt) + (ringing.overdue ? " · missed while away" : "");
+  if(ringing.audio){ $("ovAudio").src = ringing.audio.dataUrl; $("ovAudio").style.display=""; }
+  else { $("ovAudio").removeAttribute("src"); $("ovAudio").style.display="none"; }
+  if(ringing.spaced){
+    var iv = SPACED[Math.min(ringing.round || 0, SPACED.length-1)];
+    $("ovNextLbl").textContent = "Next: " + fmtDur(iv*60000);
+    $("ovNext").style.display = "";
+  } else {
+    $("ovNext").style.display = "none";
+  }
+  ov.classList.add("show");
+  ensureCtx(); startRing(); startVibrate();
+  ringStartedAt = Date.now();
+  var flip = true;
+  document.title = "🚨 " + ringing.title;
+  clearInterval(ringCapTimer);
+  ringCapTimer = setInterval(function(){
+    document.title = flip ? "🚨 🚨 🚨" : "🚨 " + ringing.title; flip = !flip;
+  }, 900);
+  render();
+}
+function dismissRing(){
+  if(ringing){
+    tasks = tasks.filter(function(x){ return x.id !== ringing.id; });
+    pushToHistory(ringing);
+  }
+  save();
+  clearInterval(ringCapTimer);
+  ringing = null;
+  nextRing();
+  render();
+}
+function snoozeRing(){
+  if(ringing){
+    ringing.dueAt = Date.now() + SNOOZE_MS;
+    ringing.createdAt = Date.now();
+    ringing._fired = false; ringing.overdue = false;
+  }
+  clearInterval(ringCapTimer);
+  ringing = null;
+  save();
+  nextRing();
+  render(); refreshViews();
+}
+function nextRound(){
+  if(!ringing) return;
+  var iv = SPACED[Math.min(ringing.round || 0, SPACED.length-1)];
+  ringing.round = (ringing.round || 0) + 1;
+  ringing.dueAt = Date.now() + iv*60000;
+  ringing.createdAt = Date.now();
+  ringing._fired = false; ringing.overdue = false;
+  clearInterval(ringCapTimer);
+  ringing = null;
+  save();
+  nextRing();
+  render(); refreshViews();
+}
+$("ovDismiss").onclick = dismissRing;
+$("ovSnooze").onclick = snoozeRing;
+$("ovNext").onclick = nextRound;
+
+/* ============ start button + chips ============ */
+function updateChip(){
+  document.querySelectorAll(".chip.q").forEach(function(c){ c.classList.remove("on"); });
+}
+document.querySelectorAll(".chip.q").forEach(function(c){
+  c.onclick = function(){
+    manualDue = Date.now() + parseInt(c.getAttribute("data-min"),10)*60000;
+    updateChip(); c.classList.add("on");
+    updateTimeStatus();
+    toast("🕘 " + fmtClock(manualDue));
+  };
+});
+$("customTime").onchange = function(){
+  var v = this.value; if(!v) return;
+  var d = new Date(v);
+  if(!isNaN(d)){ manualDue = d.getTime(); updateChip(); updateTimeStatus(); toast("🕘 " + fmtClock(manualDue)); }
+};
+$("spacedChip").onclick = function(){
+  spacedOn = !spacedOn;
+  this.classList.toggle("on", spacedOn);
+};
+$("addBtn").onclick = function(){
+  var text = $("taskText").value.trim();
+  if(!text){ toast("⚠ Record, upload or type something first"); return; }
+  var when = parseWhen(text);
+  var dueAt, auto3s = false;
+  if(when){ dueAt = when.dueAt; }
+  else if(manualDue){ dueAt = manualDue; }
+  else { dueAt = Date.now() + 3000; auto3s = true; }
+  /* organized output (edited or auto) */
+  fillOrganized(false);
+  var title = $("orgTitle").value.trim();
+  var bullets = $("orgBullets").value.split("\n").map(function(x){ return x.trim(); }).filter(Boolean);
+  if(!title){
+    var org = organize(text);
+    title = org.title; bullets = org.bullets;
+  }
+  addTask(title, bullets.join("\n"), dueAt, currentAudio, {auto3s:auto3s, spaced:spacedOn});
+  currentAudio = null; manualDue = null; spacedOn = false;
+  $("taskText").value = "";
+  $("spacedChip").classList.remove("on");
+  updateAttach(); updateChip(); updateTimeStatus();
+  $("playTryChip").style.display="none";
+  $("interim").textContent = "Press the mic and speak — or upload a voice note. Audio is always saved.";
+  $("orgCard").classList.remove("show"); orgTouched = false;
+  $("aiCard").style.display = "none";
+  toast("⏱ Countdown started");
+};
+$("kbMicChip").onclick = function(){
+  aiCard("⌨️ Speak with your KEYBOARD mic — works 100%, today",
+    "1. Tap the big text box (Transcript) below\n" +
+    "2. On your Google keyboard, tap the 🎤 mic icon\n" +
+    "3. Speak — Arabic, English or mixed, perfectly transcribed\n" +
+    "4. The app auto-organizes + detects times while you type (فكرني، كمان شوية… all understood)\n" +
+    "5. Press ▶ Start countdown — done.\n" +
+    "This uses your phone's own keyboard voice input - no engine, no key, no browser quirks.", 100, "ok");
+  try{ $("taskText").focus(); }catch(e){}
+};
+$("speechTestChip").onclick = function(){
+  if(!SpeechRec){
+    aiCard("🧪 Speech test: FAILED before start", "This browser has NO speech engine at all (SpeechRecognition missing).\n→ Open this page in Google Chrome.", 0, "err");
+    return;
+  }
+  var log = ["SAY SOMETHING for the next 5 seconds…"];
+  aiCard("🧪 Speech test starting…", log[0] + "\n(allow the mic if asked)", null);
+  var r = new SpeechRec();
+  r.lang = recLang(); r.interimResults = true; r.continuous = false;
+  var results = 0, finals = "", inter = "", lastF = -1;
+  r.onstart = function(){ log.push("✓ engine started"); aiCard("🧪 SPEAK NOW (5s)", log.join("\n"), null); };
+  r.onresult = function(ev){
+    results++;
+    inter = "";
+    for(var i = ev.resultIndex; i < ev.results.length; i++){
+      if(ev.results[i].isFinal){ if(i > lastF){ finals += ev.results[i][0].transcript + " "; lastF = i; } }
+      else inter += ev.results[i][0].transcript;
+    }
+    aiCard("🧪 Speech test: HEARD YOU ✓", log.concat(['✓ heard: "' + (finals + inter).trim().slice(0, 90) + '"']).join("\n"), 100, "ok");
+  };
+  r.onerror = function(ev){ log.push("✗ error: " + ev.error); };
+  r.onend = function(){
+    var clean = finals.trim();
+    log.push("• ended. events: " + results + " · final transcript: \"" + clean.slice(0, 90) + "\"");
+    micState(function(st){
+      log.push("• mic permission: " + st);
+      log.push("• browser: " + (navigator.userAgent.match(/(Chrome|Firefox|SamsungBrowser|Edg|OPR)\/[\d.]+/g) || ["?"])[0]);
+      aiCard(clean ? "🧪 Speech test PASSED ✓" : "🧪 Speech test FAILED",
+        log.join("\n") + (clean ? "" : "\n→ engine is dead on this phone. SEND ME THIS CARD + your phone brand/model."), clean ? 100 : 0, clean ? "ok" : "err");
+    });
+  };
+  try{
+    r.start();
+    setTimeout(function(){ try{ r.stop(); }catch(e){} }, 7000);
+  }catch(e){ aiCard("🧪 Speech test crashed", String(e), 0, "err"); }
+};
+$("diagChip").onclick = function(){
+  micState(function(state){
+    var br = (navigator.userAgent.match(/(Chrome|Firefox|SamsungBrowser|Edg|OPR|MiuiBrowser)\/[\d.]+/g) || ["unknown browser"])[0];
+    var lines = [
+      "App version: " + APP_VERSION + "  (if the badge at the top says less, you're on a CACHED OLD COPY — reload harder / clear site data)",
+      "Browser: " + br,
+      "Device: " + (IS_MOBILE ? "phone" : "desktop"),
+      "Page: " + location.protocol + "//" + location.host + (location.protocol === "https:" ? "  ✓ secure" : "  ⚠ NOT https (mic will be blocked)"),
+      "Live speech engine: " + (SpeechRec ? "✓ supported" : "✗ MISSING (use Chrome)"),
+      "Audio recorder: " + (window.MediaRecorder ? "✓ supported" : "✗ missing"),
+      "Mic permission: " + state + (state === "denied" ? "  → 🔒 → Microphone → Allow" : ""),
+      "AI engine: " + enginePref + (geminiKey ? " (key saved)" : " (no key — free transcript mode on phone)"),
+      "Agents: " + (agentsDeep ? "DEEP (2×AI)" : "FAST (1×AI)") + " · Local model pref: " + modelPref
+    ];
+    aiCard("🩺 Diagnostics — screenshot this if something fails", lines.join("\n"), null);
+  });
+};
+$("testChip").onclick = function(){
+  addTask("🔧 Test alarm", "3… 2… 1… 🔊", Date.now()+3000, null, {auto3s:true});
+  toast("⏱ Test started");
+};
+
+/* ============ boot ============ */
+load();
+loadHist();
+renderNotes();
+if(calY == null){ var _n = new Date(); calY = _n.getFullYear(); calM = _n.getMonth(); selDay = dayKey(Date.now()); }
+render();
+renderHist();
+refreshViews();
+setTimeout(function(){ tick(); }, 400);
+function relock(){
+  if("wakeLock" in navigator && tasks.some(function(x){ return x.dueAt > Date.now(); })){
+    navigator.wakeLock.request("screen").catch(function(){});
+  }
+}
+document.addEventListener("visibilitychange", relock);
+relock();
+$("verBadge").textContent = APP_VERSION;
+refreshEngineUI();
+initAutoChip();
+initAgentsChip();
+if(enginePref === "local"){
+  /* silent warm-up: pre-load the local model so recordings transcribe faster */
+  setTimeout(function(){
+    getPipe(function(){}).catch(function(){ pipePromise = null; });
+  }, 3000);
+}
+</script>
+</body>
+</html>
