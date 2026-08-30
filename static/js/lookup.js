@@ -70,35 +70,42 @@ Nearby text: "${passage || ""}"
 
 They are asking: I see this word in this sentence — what is the writer actually saying?
 
-Do NOT give a dictionary dump. First make the WHOLE SENTENCE clear. Then the word itself. Then this line. Then what a human would take it to mean.
-If the highlight is only part of a phrase (give up, take into account, in spite of), explain the whole phrase.
-Use extremely simple English. Never explain a hard word with another hard word.
+RULES FOR EVERY LINE YOU WRITE:
+- English a 12-year-old knows. Never explain a hard word with a harder word.
+- Each block: ONE sentence, 18 words or fewer.
+- If the highlight is part of a phrase (give up, take into account, in spite of), treat the WHOLE phrase as the thing to explain.
 
 RETURN ONLY:
 
-This Sentence:
-Rewrite the FULL sentence in very simple English, as if telling a friend. The learner must understand the whole line even if they forget the hard word.
+Phrase:
+The whole phrase if this is not a single word. Else leave empty.
 
-The Word:
-One short line: what this word or phrase usually means, even outside this book.
+This Sentence:
+The FULL sentence in very simple English. A friend could understand the line without the hard word.
 
 Here it means:
-One short line: what the highlighted text is doing HERE. Not other dictionary senses.
-
-What they mean:
-One short line: why the writer said THESE words here. The point they are making. Think like a human in the room, not a dictionary.
-
-How people hear it:
-One short line: how a native speaker takes it — tone, attitude, feeling. Not your personal opinion. What people would understand. Leave empty if the word has no extra colour.
+What the highlighted text is doing HERE. One short line. Not other dictionary senses.
 
 Arabic:
-Egyptian-friendly. Start with الجملة دي معناها: then the simple sentence. Then والكلمة هنا: then the word in this sentence.
+Egyptian-friendly. Start with الجملة دي معناها: then the simple sentence. Then والكلمة هنا: then the word here.
+
+The Word:
+What this word or phrase usually means, even outside this book. One short line.
+
+What they mean:
+Why the writer said THESE words here. The point. Think like a human in the room.
+
+How people hear it:
+Tone or feeling a native speaker takes. Leave empty if the word has no extra colour.
+
+In this book:
+One short line about how this idea shows up in THIS passage. Not a kitchen example.
 
 Picture It:
 One small scene they can close their eyes and see.
 
 For Instance:
-Two complete everyday English sentences that use the highlighted text with THIS same meaning. One sentence per line. Do not start with "such as". Do not explain — write the sentences only, as a native speaker would actually say them.
+Two complete everyday English sentences with THIS same meaning. One sentence per line. Do not start with "such as".
 
 Sounds Like:
 How to say it, like: oh-PAYK
@@ -109,9 +116,10 @@ Only if ONE similar word would trick them. Else leave empty.
 EXAMPLE
 Highlighted: account
 Sentence: The committee took the delay into account.
+Phrase: take into account
 This Sentence: The group thought about the delay when they decided. They did not ignore it.
-The Word: account = a record of money, or paying attention to something.
-Here it means: took into account = they considered it; it affected the decision.
+Here it means: took into account = they considered it; it changed the decision.
+The Word: account can mean money records, or paying attention to something.
 What they mean: They are saying the delay was not ignored. It changed what they decided.
 How people hear it: Careful and fair — they weighed the delay instead of brushing it off.
 Arabic: الجملة دي معناها: اللجنة حسبت حساب التأخير وهي بتقرر. والكلمة هنا: take into account يعني يعتبر الحاجة دي مش يتجاهلها.
@@ -129,11 +137,13 @@ Do not use markdown, bullets, or emojis. Use exactly those headings.
 export function parseCoach(text) {
   const result = {
     "Sounds Like": "",
+    Phrase: "",
     "This Sentence": "",
     "The Word": "",
     "Here it means": "",
     "What they mean": "",
     "How people hear it": "",
+    "In this book": "",
     Meaning: "",
     Context: "",
     "In Real Life": "",
@@ -147,11 +157,13 @@ export function parseCoach(text) {
   };
   const headings = [
     "How people hear it:",
+    "In this book:",
     "What they mean:",
     "Sounds Like:",
     "This Sentence:",
     "The Word:",
     "Here it means:",
+    "Phrase:",
     "Meaning:",
     "Context:",
     "In Real Life:",
@@ -185,7 +197,7 @@ function cacheKey(q, sentence) {
 
 function cacheGet(id) {
   try {
-    const raw = sessionStorage.getItem("cw-coach2:" + id);
+    const raw = sessionStorage.getItem("cw-coach3:" + id);
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
@@ -194,7 +206,7 @@ function cacheGet(id) {
 
 function cacheSet(id, coach) {
   try {
-    sessionStorage.setItem("cw-coach:" + id, JSON.stringify(coach));
+    sessionStorage.setItem("cw-coach3:" + id, JSON.stringify(coach));
   } catch {
     /* ignore */
   }

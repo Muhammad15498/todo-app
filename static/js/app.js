@@ -175,12 +175,37 @@ async function openDoc(id) {
       return;
     }
   }
+  const place = readPlace(doc.id);
   await reader.load({
     type: doc.type === "sample" || doc.type === "md" || doc.type === "html" ? "txt" : doc.type,
     title: doc.title,
     text: doc.text || (blob && doc.type === "txt" ? await blob.text() : ""),
-    blob
+    blob,
+    id: doc.id,
+    page: place?.page || doc.pageIndex || 0
   });
+}
+
+function readPlace(id) {
+  if (!id) return null;
+  try {
+    return JSON.parse(localStorage.getItem("cw-place:" + id) || "null");
+  } catch {
+    return null;
+  }
+}
+
+function writePlace(id, page) {
+  if (!id) return;
+  try {
+    localStorage.setItem("cw-place:" + id, JSON.stringify({ page, at: Date.now() }));
+  } catch {
+    /* ignore */
+  }
+  if (state.current && state.current.id === id) {
+    state.current.pageIndex = page;
+    db.putDoc({ ...state.current, pageIndex: page }).catch(() => {});
+  }
 }
 
 async function ingestFiles(fileList) {
@@ -239,7 +264,7 @@ function emptyPanelHtml() {
   return `
     <div class="panel-empty">
       <h2>Highlight 1–4 words.</h2>
-      <p>Let go once. You get the whole sentence in simple English, then what the word is doing in that line.</p>
+      <p>Let go once. You get the line in simple English, then what the word is doing here, then Arabic.</p>
     </div>`;
 }
 
@@ -301,36 +326,37 @@ function renderPanel(data, loading) {
   const hereMeans = (coach && (coach["Here it means"] || coach.Meaning || "").trim()) || "";
   const theyMean = (coach && (coach["What they mean"] || "").trim()) || "";
   const peopleHear = (coach && (coach["How people hear it"] || coach["The Idea"] || "").trim()) || "";
+  const inBook = (coach && (coach["In this book"] || "").trim()) || "";
+  const phrase =
+    (coach && (coach.Phrase || "").trim()) ||
+    (String(data.query || "").trim().split(/\s+/).filter(Boolean).length >= 2 ? String(data.query).trim() : "");
+  const head = phrase || data.headword || data.query;
+  const isPhrase = !!(phrase && phrase.split(/\s+/).length >= 2);
   const mainPlain =
-    thisSentence ||
     hereMeans ||
+    thisSentence ||
     data.contextual?.definition ||
-    data.wiki?.extract ||
-    "I could not find a dictionary entry for this. Try a slightly shorter phrase, or add a free Gemini key in Settings — the same engine as Context Word.";
+    "I could not find a dictionary entry for this. Try a slightly shorter phrase, or add a free Gemini key in Settings.";
 
   const pos = data.contextual?.pos || "";
   const senses = (data.meanings || []).slice(0, 6);
+  const section = (title, inner) =>
+    inner ? `<div class="block"><h3>${title}</h3>${inner}</div>` : "";
 
   const coachHtml = coach
     ? `
       ${
         data.sentence
-          ? `<div class="block"><h3>The line you are reading</h3><p class="sentence">${markSentence(data.sentence, data.query)}</p></div>`
+          ? section("The line you are reading", `<p class="sentence">${markSentence(data.sentence, data.query)}</p>`)
           : ""
       }
-      ${thisSentence ? `<div class="block"><h3>This sentence, simply</h3><p class="plain">${escapeHtml(thisSentence)}</p></div>` : ""}
-      ${theWord ? `<div class="block"><h3>The word itself</h3><p class="plain">${escapeHtml(theWord)}</p></div>` : ""}
-      ${hereMeans ? `<div class="block"><h3>Here it means</h3><p class="plain">${escapeHtml(hereMeans)}</p></div>` : ""}
-      ${theyMean ? `<div class="block"><h3>What they mean by saying it</h3><p class="plain">${escapeHtml(theyMean)}</p></div>` : ""}
-      ${peopleHear ? `<div class="block"><h3>How people hear it</h3><p class="plain">${escapeHtml(peopleHear)}</p></div>` : ""}
+      ${section("This sentence, simply", thisSentence ? `<p class="plain">${escapeHtml(thisSentence)}</p>` : "")}
+      ${section("Here it means", hereMeans ? `<p class="plain">${escapeHtml(hereMeans)}</p>` : "")}
       ${
         coach.Arabic.trim()
-          ? `<div class="block"><h3>العربي ببساطة</h3><p class="translation" dir="rtl">${escapeHtml(coach.Arabic.trim())}</p></div>`
+          ? section("العربي ببساطة", `<p class="translation" dir="rtl">${escapeHtml(coach.Arabic.trim())}</p>`)
           : ""
       }
-      ${coach["Picture It"]?.trim() ? `<div class="block"><h3>See it in your head</h3><p class="plain">${escapeHtml(coach["Picture It"].trim())}</p></div>` : ""}
-      ${exampleBlocks(coach["For Instance"])}
-      ${coach["Don't Confuse"]?.trim() ? `<div class="block"><h3>Don't confuse</h3><p class="plain">${escapeHtml(coach["Don't Confuse"].trim())}</p></div>` : ""}
     `
     : `
       <div class="block">
@@ -370,22 +396,41 @@ function renderPanel(data, loading) {
     `;
 
   const sounds = (coach && coach["Sounds Like"] && coach["Sounds Like"].trim()) || data.phonetic || "";
+  const extra = coach
+    ? [
+        section("The word itself", theWord ? `<p class="plain">${escapeHtml(theWord)}</p>` : ""),
+        section("What they mean by saying it", theyMean ? `<p class="plain">${escapeHtml(theyMean)}</p>` : ""),
+        section("How people hear it", peopleHear ? `<p class="plain">${escapeHtml(peopleHear)}</p>` : ""),
+        section("In this book", inBook ? `<p class="plain">${escapeHtml(inBook)}</p>` : ""),
+        coach["Picture It"]?.trim()
+          ? section("See it in your head", `<p class="plain">${escapeHtml(coach["Picture It"].trim())}</p>`)
+          : "",
+        exampleBlocks(coach["For Instance"]),
+        coach["Don't Confuse"]?.trim()
+          ? section("Don't confuse", `<p class="plain">${escapeHtml(coach["Don't Confuse"].trim())}</p>`)
+          : ""
+      ].join("")
+    : "";
   el.innerHTML = `
     <div class="headword-row">
-      <h2 class="headword">${escapeHtml(data.headword || data.query)}</h2>
+      <h2 class="headword">${escapeHtml(head)}</h2>
       <button class="icon-btn speak-btn" id="speakWord" type="button" aria-label="Pronounce">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M11 5L6 9H3v6h3l5 4V5z"/><path d="M16 8.5a5 5 0 0 1 0 7"/><path d="M18.5 6a8.5 8.5 0 0 1 0 12"/></svg>
       </button>
     </div>
     <div class="meta-row">
       ${sounds ? `<span class="phonetic">${escapeHtml(sounds)}</span>` : ""}
+      ${isPhrase ? `<span class="pos">phrase</span>` : ""}
       ${pos ? `<span class="pos">${escapeHtml(pos)}</span>` : ""}
     </div>
     ${coachHtml}
+    ${
+      extra
+        ? `<button class="more-toggle" id="moreGloss" type="button">More about this</button><div class="more-gloss hidden" id="moreGlossBody">${extra}</div>`
+        : ""
+    }
     <div class="panel-actions">
       <button class="primary-btn" id="saveWord" type="button">Save to notebook</button>
-      ${data.audio ? `<button class="ghost-btn" id="playAudio" type="button">Pronunciation</button>` : ""}
-      ${data.wiki?.url ? `<a class="ghost-btn" href="${data.wiki.url}" target="_blank" rel="noopener">Wikipedia</a>` : ""}
     </div>
     ${
       !coach && senses.length > 1
@@ -402,13 +447,13 @@ function renderPanel(data, loading) {
     ${data.aiError ? `<p class="hint">${escapeHtml(data.aiError)}</p>` : ""}
   `;
 
-  $("#speakWord")?.addEventListener("click", () => speak(data.headword || data.query));
-  $("#playAudio")?.addEventListener("click", () => {
-    try {
-      new Audio(data.audio).play();
-    } catch {
-      speak(data.headword || data.query);
-    }
+  $("#speakWord")?.addEventListener("click", () => speak(head || data.query));
+  $("#moreGloss")?.addEventListener("click", () => {
+    const body = $("#moreGlossBody");
+    const btn = $("#moreGloss");
+    if (!body || !btn) return;
+    const closed = body.classList.toggle("hidden");
+    btn.textContent = closed ? "More about this" : "Less";
   });
   $("#saveWord")?.addEventListener("click", () => saveWord(data, mainPlain));
   $$("[data-phrase]", el).forEach((btn) => {
@@ -609,7 +654,7 @@ function maybeInstallTip() {
   const android = /android/i.test(ua);
   const ios = /iphone|ipad|ipod/i.test(ua);
   const stand = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone;
-  if (stand || sessionStorage.getItem("cw-install-tip")) return;
+  if (stand || localStorage.getItem("cw-install-tip")) return;
   if (android || ios) {
     if (ios) {
       $("#installTipText").innerHTML = "On iPhone: tap Share, then <b>Add to Home Screen</b>.";
@@ -694,7 +739,8 @@ async function boot() {
   reader = new Reader({
     stage: $("#stage"),
     getSettings: () => state.settings,
-    onGloss: (info) => gloss(info)
+    onGloss: (info) => gloss(info),
+    onPlace: (id, page) => writePlace(id, page)
   });
 
   if (window.pdfjsLib) {
@@ -836,7 +882,7 @@ async function boot() {
 
   $("#installDismiss")?.addEventListener("click", () => {
     $("#installTip").classList.add("hidden");
-    sessionStorage.setItem("cw-install-tip", "1");
+    localStorage.setItem("cw-install-tip", "1");
   });
   maybeInstallTip();
 

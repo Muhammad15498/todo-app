@@ -326,10 +326,11 @@ function setReadModeBtn(mode, hasToggle) {
 }
 
 export class Reader {
-  constructor({ stage, onGloss, getSettings }) {
+  constructor({ stage, onGloss, getSettings, onPlace }) {
     this.stage = stage;
     this.onGloss = onGloss;
     this.getSettings = getSettings;
+    this.onPlace = onPlace;
     this.cleanup = [];
     this.pdf = null;
     this.book = null;
@@ -397,10 +398,12 @@ export class Reader {
     return Math.max(420, Math.floor((w - 28) * this.zoom));
   }
 
-  async load({ type, title, text, blob }) {
+  async load({ type, title, text, blob, page, id }) {
     this.destroy();
     this.zoom = 1;
     this._title = title || "";
+    this._docId = id || "";
+    this._startPage = Math.max(0, Number(page) || 0);
     this.stage.dataset.kind = type;
     if (type === "pdf") return this.loadPdf(blob);
     if (type === "epub") return this.loadEpub(blob);
@@ -548,13 +551,14 @@ export class Reader {
     const pages = await extractPdfPages(pdf);
     this._pages = pages;
     this._plain = pages.filter(Boolean).join("\n\n");
-    this._pageIndex = 0;
+    const start = Math.min(Math.max(0, this._startPage || 0), Math.max(0, pages.length - 1));
+    this._pageIndex = start;
     if ((this._plain || "").replace(/\s/g, "").length > 80) {
       this._pdfMode = "text";
       this.stage.innerHTML = "";
       this.stage.dataset.kind = "txt";
       setReadModeBtn("text", true);
-      return this.showBookPage(0);
+      return this.showBookPage(start);
     }
     setReadModeBtn("pages", false);
     setPager(0, 0);
