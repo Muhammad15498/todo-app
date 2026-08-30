@@ -279,6 +279,7 @@
       <button class="chip engine" data-engine="local">💻 Local — offline</button>
       <button class="chip" id="agentsChip">🤝 Agents: FAST</button>
     </div>
+    <div class="dm" id="teamRow" style="margin-top:8px;padding:8px 12px;background:#f6f8fa;border-radius:10px;font-size:.85rem;line-height:1.6"></div>
     <div id="keyRow" style="display:none; margin-top:8px">
       <div class="row">
         <input type="password" id="geminiKey" placeholder="Paste your free Gemini API key" style="flex:1; min-width:220px; background:#fbfcfe;border:1px solid var(--line2);color:var(--text);border-radius:12px;padding:9px 12px;font-size:.9rem">
@@ -357,7 +358,7 @@
       <button class="x" id="speakChip" style="float:right" title="voice replies on/off">🔊</button>
       <button class="x" id="voxChip" style="float:right;margin-right:4px" title="change AI voice">🎭</button></div>
     <div class="dm" id="resTrans" style="white-space:pre-wrap;background:#f6f8fa;border-radius:8px;padding:8px 10px;margin:6px 0"></div>
-    <div class="dm" id="resSum" style="font-style:italic;color:#495057"></div>
+    <div class="dm" id="resSum" style="font-style:italic;color:#495057;white-space:pre-wrap"></div>
     <div class="dm" id="resTime" style="color:#0b7285"></div>
     <div class="dm" id="resOrg" style="white-space:pre-wrap;margin-top:6px"></div>
   </div>
@@ -1066,7 +1067,7 @@ function startRecognition(onInterim, onFinal, onErr){
   return r;
 }
 var IS_MOBILE = /Android|iPhone|iPad|Mobi/i.test(navigator.userAgent || "");
-var APP_VERSION = "v32";
+var APP_VERSION = "v33";
 function micState(cb){
   if(navigator.permissions && navigator.permissions.query){
     navigator.permissions.query({name:"microphone"}).then(function(p){ cb(p.state); }).catch(function(){ cb("unknown"); });
@@ -1501,6 +1502,7 @@ function refreshEngineUI(){
     c.classList.toggle("on", c.getAttribute("data-engine") === enginePref);
   });
   $("keyRow").style.display = (enginePref === "local") ? "none" : "";
+  updateTeam();
   var kf = $("geminiKey");
   if(enginePref === "groq"){ kf.placeholder = "Paste your free Groq key (gsk_… — console.groq.com/keys)"; if(groqKey) kf.value = groqKey; }
   else { kf.placeholder = "Paste your Gemini API key"; if(geminiKey) kf.value = geminiKey; }
@@ -1528,6 +1530,7 @@ $("keySave").onclick = function(){
   var kv = $("geminiKey").value.trim();
   if(enginePref === "groq"){
     groqKey = kv;
+    updateTeam();
     try{ localStorage.setItem(GQKEY, groqKey); }catch(e){}
     refreshEngineUI();
     if(!groqKey){ toast("Groq key cleared"); return; }
@@ -1625,7 +1628,7 @@ function geminiPrompt(withAudio){
     " (timezone " + (Intl.DateTimeFormat().resolvedOptions().timeZone || "local") + "). Compute delay_seconds from THIS moment.\n" +
     "Return ONLY minified JSON with these keys:\n" +
     "\"transcript\": verbatim transcript of what was said (keep original language(s)),\n" +
-    "\"summary\": one-sentence summary of what the speaker wants, in the note's language,\n" +
+    "\"summary\": 1-3 ultra-short bullet points, each on its own line starting with \"• \", in the speaker's language mix,\n" +
     "\"reminders\": array of 1-4 objects, one PER distinct reminder request — every explicit فكرني/remind me marker starts its own entry carrying only the note-part it belongs to; a single unmarked note = exactly one entry. Each object: {\"title\": core commitment 3-7 words in the note's language, \"bullets\": 1-5 rewritten clean points, \"delay_seconds\": per-entry seconds, \"quoted_time\": per-entry bool},\n" +
     "\"bullets\": array of 1-5 REWRITTEN notes — never copy the speaker's sentences; compress each distinct thought to its essence (max ~10 words, imperative form: \"Send X\", \"Check Y\"); merge duplicates and related items into one; drop filler, hesitations, meta-talk about apps/processes/deadline talk that is not a task; keep the speaker's language; [] if the note is one simple thought,\n" +
     "\"delay_seconds\": integer seconds from NOW until the reminder should ring, parsed from ANY time mention, including typos, half-words and Egyptian/colloquial Arabic: exact (\"at 9pm\", \"الساعة ٩ مسا\", \"tomorrow morning\") or fuzzy (\"in a bit/soon/then\"=300, \"بعد شوية/كمان شوية/شويتين\"=300, \"كمان خمساية/كمان خمسة\"=300, \"خمس دقايق كدا\"=300, \"in a couple of minutes\"=120, \"a few minutes\"=180, \"some minutes\"=600, \"half an hour\"=1800, \"نص ساعة\"=1800, \"later/بعدين\"=3600). IMPORTANT INTENT RULES: (1) count a time ONLY if the speaker PERSONALLY wants a reminder/plan/event at that time (first-person: فكرني، لازم، عندي، هعمل، I should, remind me, meeting at X). Time inside narrated/quoted speech (وهو قاللى اصبر كمان شوية، he told me to wait) → delay_seconds=null AND quoted_time=true. (2) EXCEPTION: if the speaker explicitly closes the note (or a part of it) with فكرني / ذكرني / remind me (e.g. ending with «فكرني بها»), that time IS intentional → set the real delay even if it was narrated. (3) Multiple فكرني/remind me markers = multiple reminders array entries, each with its own time." +
@@ -2041,12 +2044,23 @@ $("speakChip").textContent = voiceReplyOn ? "🔊" : "🔇";
 $("voxChip").onclick = function(){
   voxIdx = (voxIdx + 1) % VOICES.length;
   try{ localStorage.setItem("voiceAlarm_vox", String(voxIdx)); }catch(e){}
+  updateTeam();
   toast("🎭 AI voice " + (voxIdx + 1) + "/" + VOICES.length + ": " + VOICES[voxIdx].en + " (EN) · " + VOICES[voxIdx].ar + " (AR)");
   confirmSpeak("تمام، هفكرك.", true);
 };
 var DEFKEY = "voiceAlarm_defaultSec", defSecVal = 2;
 try{ defSecVal = Math.max(1, parseInt(localStorage.getItem(DEFKEY) || "2", 10) || 2); }catch(e){}
 function defSec(){ return defSecVal; }
+function updateTeam(){
+  var ears = enginePref === "gemini" ? "Gemini (your pick — best Arabic ears)" : (enginePref === "groq" ? "whisper-large-v3" : "local whisper (offline)");
+  var brain = groqKey ? (agentsDeep ? "GPT-OSS-120B (DEEP)" : "Qwen3-32B (FAST)") : (geminiKey ? "Gemini" : "✂️ basic splitter only");
+  var voice = groqKey ? ("Orpheus — " + VOICES[voxIdx].en + " (EN) / " + VOICES[voxIdx].ar + " (AR)") : "device system voice";
+  $("teamRow").innerHTML = "🤝 <b>YOUR AI TEAM</b> — they pass the work to each other automatically:<br>" +
+    "🎧 <b>Ears</b> (the chip above picks one): " + ears + "<br>" +
+    "🧠 <b>Brain</b> (needs the gsk_ key): " + brain + "<br>" +
+    "⚖️ <b>Referee</b> (always on, no key): built-in time parser cross-check<br>" +
+    "🔊 <b>Voice</b>: " + voice + (groqKey ? "" : " — <b>paste a free Groq key to unlock Brain + human voice</b>");
+}
 $("resTime").onclick = function(){
   if(String($("resTime").textContent).indexOf("test default") < 0) return;
   var v = parseInt(prompt("When NO time is understood, ring after (seconds):", defSecVal), 10);
@@ -2063,50 +2077,77 @@ $("speakChip").onclick = function(){
 };
 var EMPTY_TXT = "(the voice note is empty)";
 var VOICES = [
-  { en: "hannah", ar: "Fahad"   },
-  { en: "diana",  ar: "Sultan"  },
-  { en: "autumn", ar: "Noura"   }
+  { en: "hannah", ar: "Fahad"    },
+  { en: "diana",  ar: "Noura"    },
+  { en: "autumn", ar: "Lulwa"    },
+  { en: "austin", ar: "Sultan"   },
+  { en: "daniel", ar: "Abdullah" },
+  { en: "troy",   ar: "Aisha"    }
 ];
 var voxIdx = 0;
 try{ voxIdx = Math.max(0, Math.min(VOICES.length - 1, parseInt(localStorage.getItem("voiceAlarm_vox") || "0", 10) || 0)); }catch(e){}
 var voiceReplyOn = true;
 try{ voiceReplyOn = localStorage.getItem("voiceAlarm_voiceReply") !== "0"; }catch(e){}
+function langRuns(text){
+  var runs = [], cur = "", curAr = null;
+  String(text).split("").forEach(function(ch){
+    var ar = /[\u0600-\u06FF]/.test(ch);
+    if(curAr === null || ar === curAr || (/[\s.,!?؟،:;()\'\-]/.test(ch) && cur)){ cur += ch; if(curAr === null) curAr = ar; }
+    else { runs.push({ ar: !!curAr, txt: cur }); cur = ch; curAr = ar; }
+  });
+  if(cur) runs.push({ ar: !!curAr, txt: cur });
+  return runs.filter(function(r){ return /[\u0600-\u06FF\w]/.test(r.txt); });
+}
+async function orpheusSay(text, ar){
+  var resp = await withTimeout(fetch("https://api.groq.com/openai/v1/audio/speech", {
+    method: "POST",
+    headers: { "Authorization": "Bearer " + groqKey, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: ar ? "canopylabs/orpheus-arabic-saudi" : "canopylabs/orpheus-v1-english",
+      voice: ar ? VOICES[voxIdx].ar : VOICES[voxIdx].en,
+      input: String(text).slice(0, 190),
+      response_format: "wav"
+    })
+  }), 30000, "tts:timeout");
+  if(!resp.ok) throw new Error("tts http " + resp.status);
+  var ab = await resp.arrayBuffer();
+  await new Promise(function(res){
+    var a = new Audio(URL.createObjectURL(new Blob([ab], { type: "audio/wav" })));
+    a.onended = res; a.onerror = res;
+    setTimeout(res, 20000);
+    a.play();
+  });
+}
+function localSay(text, ar){
+  return new Promise(function(res){
+    try{
+      if(!window.speechSynthesis){ res(); return; }
+      var u = new SpeechSynthesisUtterance(text);
+      var vs = speechSynthesis.getVoices() || [], pick = null;
+      for(var i = 0; i < vs.length; i++){
+        var nm = String(vs[i].name || ""), vl = String(vs[i].lang || "");
+        if(ar ? vl.indexOf("ar") === 0 : vl.indexOf("en") === 0){
+          if(!pick || /Google|Microsoft|Natural|Neural/.test(nm)) pick = vs[i];
+        }
+      }
+      if(pick) u.voice = pick;
+      u.lang = ar ? "ar-EG" : "en-US";
+      u.onend = res; u.onerror = res;
+      setTimeout(res, 15000);
+      speechSynthesis.speak(u);
+    }catch(e){ res(); }
+  });
+}
 async function confirmSpeak(text, langAr){
   if(!voiceReplyOn || !text) return;
-  text = String(text).slice(0, 280);
-  if(groqKey){
-    /* humanlike Orpheus TTS on the same free gsk_ key */
-    try{
-      var resp = await withTimeout(fetch("https://api.groq.com/openai/v1/audio/speech", {
-        method: "POST",
-        headers: { "Authorization": "Bearer " + groqKey, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: langAr ? "canopylabs/orpheus-arabic-saudi" : "canopylabs/orpheus-v1-english",
-          voice: langAr ? VOICES[voxIdx].ar : VOICES[voxIdx].en,
-          input: text, response_format: "mp3"
-        })
-      }), 30000, "tts:timeout");
-      if(resp.ok){
-        var ab = await resp.arrayBuffer();
-        var a = new Audio(URL.createObjectURL(new Blob([ab], { type: "audio/mpeg" })));
-        a.play();
-        return;
-      }
-    }catch(e){}
+  var runs = langRuns(String(text));
+  if(!runs.length) runs = [{ ar: !!langAr, txt: String(text) }];
+  for(var i = 0; i < runs.length; i++){
+    var piece = runs[i].txt.trim().slice(0, 190);
+    if(!piece) continue;
+    if(groqKey){ try{ await orpheusSay(piece, runs[i].ar); continue; }catch(e){} }
+    await localSay(piece, runs[i].ar);
   }
-  /* free local system voice - instant, offline, decent */
-  try{
-    if(!window.speechSynthesis) return;
-    var u = new SpeechSynthesisUtterance(text);
-    var vs = speechSynthesis.getVoices() || [], pick = null;
-    for(var i = 0; i < vs.length; i++){
-      var vl = String(vs[i].lang || "");
-      if(langAr ? vl.indexOf("ar") === 0 : vl.indexOf("en") === 0){ if(!pick || vs[i].localService) pick = vs[i]; }
-    }
-    if(pick) u.voice = pick;
-    u.lang = langAr ? "ar-EG" : "en-US";
-    speechSynthesis.speak(u);
-  }catch(e){}
 }
 function showResult(ai, srcTag, howText){
   var rc = $("resCard"); if(!rc) return;
@@ -2501,6 +2542,7 @@ $("testChip").onclick = function(){
 load();
 loadHist();
 renderNotes();
+updateTeam();
 if(calY == null){ var _n = new Date(); calY = _n.getFullYear(); calM = _n.getMonth(); selDay = dayKey(Date.now()); }
 render();
 renderHist();
