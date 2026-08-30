@@ -448,6 +448,8 @@ a { color: var(--accent); }
   font-family: var(--font-display);
   font-size: 1.05rem;
   letter-spacing: -0.02em;
+  flex: 1;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -866,6 +868,9 @@ body.cw-resizing * {
   align-items: flex-end;
   justify-content: center;
   padding: 1rem;
+}
+@media (min-width: 721px) {
+  .backdrop { align-items: center; }
 }
 .modal {
   background: var(--panel);

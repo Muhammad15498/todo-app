@@ -260,6 +260,32 @@ async function ingestPaste(title, text) {
   await openDoc(id);
 }
 
+function l1Heading() {
+  const lang = state.settings.lang || "ar";
+  return (
+    {
+      ar: "العربي ببساطة",
+      en: "In plain English",
+      tr: "Türkçe",
+      es: "Español",
+      fr: "Français",
+      de: "Deutsch",
+      pt: "Português",
+      ur: "اردو",
+      fa: "فارسی",
+      hi: "हिन्दी",
+      zh: "中文",
+      ja: "日本語",
+      ko: "한국어",
+      ru: "Русский"
+    }[lang] || "Your language"
+  );
+}
+
+function l1Dir() {
+  return /^(ar|ur|fa)$/.test(state.settings.lang || "ar") ? "rtl" : "ltr";
+}
+
 function emptyPanelHtml() {
   return `
     <div class="panel-empty">
@@ -354,7 +380,7 @@ function renderPanel(data, loading) {
       ${section("Here it means", hereMeans ? `<p class="plain">${escapeHtml(hereMeans)}</p>` : "")}
       ${
         coach.Arabic.trim()
-          ? section("العربي ببساطة", `<p class="translation" dir="rtl">${escapeHtml(coach.Arabic.trim())}</p>`)
+          ? section(l1Heading(), `<p class="translation" dir="${l1Dir()}">${escapeHtml(coach.Arabic.trim())}</p>`)
           : ""
       }
     `
@@ -758,6 +784,11 @@ async function boot() {
   window.cwTogglePdfMode = () => reader?.togglePdfMode?.();
   window.cwClosePanel = () => closePanel();
   window.cwPage = (delta) => reader?.turnPage?.(delta);
+  window.cwHome = () => {
+    reader?.destroy?.();
+    showView("library");
+    refreshLibrary();
+  };
   if (!window.CW) {
     $("#openFile")?.addEventListener("click", () => $("#fileInput").click());
   }
@@ -926,8 +957,7 @@ async function boot() {
   $("#stage")?.addEventListener("scroll", () => removeExplainButton());
 
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.getRegistrations().then((rs) => rs.forEach((r) => r.unregister()));
-    if (window.caches) caches.keys().then((keys) => keys.forEach((k) => caches.delete(k)));
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
   }
 
   ensureSamples().then(() => refreshLibrary()).catch(() => {

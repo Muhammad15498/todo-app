@@ -36,7 +36,7 @@ export async function lookup({ query, sentence, passage, settings }) {
     return result;
   }
 
-  const cacheId = cacheKey(q, sentence);
+  const cacheId = cacheKey(q, sentence, settings?.lang);
   const hit = cacheGet(cacheId);
   if (hit) {
     result.coach = hit;
@@ -47,7 +47,7 @@ export async function lookup({ query, sentence, passage, settings }) {
     const text = await generateCoach(
       geminiKey,
       groqKey,
-      buildCoachPrompt(wordSafe(q), sentence, (passage || "").slice(0, 2500))
+      buildCoachPrompt(wordSafe(q), sentence, (passage || "").slice(0, 2500), settings?.lang)
     );
     result.coach = parseCoach(text);
     cacheSet(cacheId, result.coach);
@@ -61,7 +61,31 @@ function wordSafe(q) {
   return String(q).slice(0, 80);
 }
 
-function buildCoachPrompt(word, sentence, passage) {
+function langLine(lang) {
+  const code = String(lang || "ar").toLowerCase();
+  if (code === "en") return "Arabic:\nLeave empty.";
+  if (code === "ar") {
+    return "Arabic:\nEgyptian-friendly. Start with الجملة دي معناها: then the simple sentence. Then والكلمة هنا: then the word here.";
+  }
+  const names = {
+    tr: "Turkish",
+    es: "Spanish",
+    fr: "French",
+    de: "German",
+    pt: "Portuguese",
+    ur: "Urdu",
+    fa: "Persian",
+    hi: "Hindi",
+    zh: "Chinese",
+    ja: "Japanese",
+    ko: "Korean",
+    ru: "Russian"
+  };
+  const name = names[code] || code;
+  return `Arabic:\nOne or two short sentences in ${name}. Same job: the line, then the word here.`;
+}
+
+function buildCoachPrompt(word, sentence, passage, lang) {
   return `You are a patient English teacher for an intelligent adult who is NOT a native speaker.
 
 They highlighted: "${word}"
@@ -86,8 +110,7 @@ The FULL sentence in very simple English. A friend could understand the line wit
 Here it means:
 What the highlighted text is doing HERE. One short line. Not other dictionary senses.
 
-Arabic:
-Egyptian-friendly. Start with الجملة دي معناها: then the simple sentence. Then والكلمة هنا: then the word here.
+${langLine(lang)}
 
 The Word:
 What this word or phrase usually means, even outside this book. One short line.

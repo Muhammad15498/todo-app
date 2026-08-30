@@ -601,7 +601,8 @@
       showModal("settingsModal", false);
       showModal("pasteModal", false);
       showModal("noteModal", false);
-      showView("library");
+      if (window.cwHome) window.cwHome();
+      else showView("library");
     },
     vocab: function () {
       showView("vocab");
