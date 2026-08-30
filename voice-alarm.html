@@ -284,6 +284,12 @@
         <button class="chip" id="agentsChip">🤝 Agents: FAST</button>
       </div>
     <div class="dm" id="teamRow" style="margin-top:8px;padding:8px 12px;background:#f6f8fa;border-radius:10px;font-size:.85rem;line-height:1.6"></div>
+    <div class="row" style="margin-top:8px">
+      <button class="chip" id="exportChip">⬇ Export backup</button>
+      <button class="chip" id="importChip">⬆ Import backup</button>
+      <input type="file" id="importFile" accept="application/json" style="display:none">
+    </div>
+    <div class="hint" style="margin-top:6px">Backup = tasks + saved notes + voice notes (no API keys) → one JSON file. Import it on any device.</div>
     <div id="keyRow" style="display:none; margin-top:8px">
       <div class="row">
         <input type="password" id="geminiKey" placeholder="Paste your free Gemini API key" style="flex:1; min-width:220px; background:#fbfcfe;border:1px solid var(--line2);color:var(--text);border-radius:12px;padding:9px 12px;font-size:.9rem">
@@ -367,20 +373,24 @@
     <div class="dm" id="resSum" style="font-style:italic;color:#495057;white-space:pre-wrap"></div>
     <div class="dm" id="resTime" style="color:#0b7285"></div>
     <div class="dm" id="resOrg" style="white-space:pre-wrap;margin-top:6px"></div>
-    <div style="margin-top:10px;border-top:1px dashed var(--line2);padding-top:8px">
-      <div class="lbl">💬 Ask the AI about this note — thoughts, organize, plan, guide</div>
-      <div id="chatLog" class="dm" style="max-height:220px;overflow:auto;background:#f6f8fa;border-radius:8px;padding:8px 10px;margin:6px 0;white-space:pre-wrap"></div>
-      <div class="row">
-        <input type="text" id="chatIn" placeholder="what should I do first? / summarize this / plan my week…" style="flex:1;min-width:200px;background:#fbfcfe;border:1px solid var(--line2);color:var(--text);border-radius:12px;padding:9px 12px;font-size:.9rem">
-        <button class="chip" id="chatBtn">➤</button>
-      </div>
-    </div>
+    <div class="hint" style="margin-top:6px">✏️ This box is editable — fix anything, then 🗒 saves it as a note. 💬 The AI chat lives in its own card below.</div>
   </div>
 
   <!-- SAVED NOTES -->
   <div class="card">
     <div class="lbl">🗒 Saved notes — tap 💬 to discuss one with the AI</div>
     <div id="txtNotesList"></div>
+  </div>
+
+  <!-- AI CHAT - always visible -->
+  <div class="card">
+    <div class="lbl">💬 AI Chat — type below, press Send (English replies, spoken too)</div>
+    <div id="chatLog" class="dm" style="min-height:60px;max-height:260px;overflow:auto;background:#f6f8fa;border-radius:8px;padding:8px 10px;margin:6px 0;white-space:pre-wrap"></div>
+    <div class="row">
+      <input type="text" id="chatIn" placeholder="Type here… e.g. plan my day / what should I do first?" style="flex:1;min-width:200px;background:#fbfcfe;border:1px solid var(--line2);color:var(--text);border-radius:12px;padding:9px 12px;font-size:.9rem">
+      <button class="chip" id="chatBtn">➤ Send</button>
+    </div>
+    <div class="hint">It knows your latest note. Mention a time in any mix (كمان 5 minutes / in an hour) → the timer arms itself.</div>
   </div>
 
   <!-- VOICE NOTES LIBRARY -->
@@ -1087,7 +1097,7 @@ function startRecognition(onInterim, onFinal, onErr){
   return r;
 }
 var IS_MOBILE = /Android|iPhone|iPad|Mobi/i.test(navigator.userAgent || "");
-var APP_VERSION = "v34";
+var APP_VERSION = "v35";
 function micState(cb){
   if(navigator.permissions && navigator.permissions.query){
     navigator.permissions.query({name:"microphone"}).then(function(p){ cb(p.state); }).catch(function(){ cb("unknown"); });
@@ -2065,8 +2075,14 @@ $("voxChip").onclick = function(){
   voxIdx = (voxIdx + 1) % VOICES.length;
   try{ localStorage.setItem("voiceAlarm_vox", String(voxIdx)); }catch(e){}
   updateTeam();
-  toast("🎭 AI voice " + (voxIdx + 1) + "/" + VOICES.length + ": " + VOICES[voxIdx].en + " (EN) · " + VOICES[voxIdx].ar + " (AR)");
-  confirmSpeak("تمام، هفكرك.", true);
+  var vname = VOICES[voxIdx].en === "kokoro" ? "🌌 Kokoro — most natural, one-time ~90 MB, then free offline" : (VOICES[voxIdx].en + " (EN) · " + VOICES[voxIdx].ar + " (AR)");
+  toast("🎭 AI voice " + (voxIdx + 1) + "/" + VOICES.length + ": " + vname);
+  if(VOICES[voxIdx].en === "kokoro" && !kokoPipe && confirm("Download the natural Kokoro voice now?\nOne-time ~90 MB, then free and offline forever.")){
+    getKokoro(makeProgCb()).then(function(){ toast("🌌 Kokoro voice ready"); confirmSpeak("Voice ready. This is how I sound now.", false); })
+      .catch(function(){ toast("⚠ Kokoro download failed — using cloud voice"); });
+  } else {
+    confirmSpeak("This is how I sound now.", false);
+  }
 };
 var DEFKEY = "voiceAlarm_defaultSec", defSecVal = 2;
 try{ defSecVal = Math.max(1, parseInt(localStorage.getItem(DEFKEY) || "2", 10) || 2); }catch(e){}
@@ -2074,7 +2090,8 @@ function defSec(){ return defSecVal; }
 function updateTeam(){
   var ears = enginePref === "gemini" ? "Gemini (your pick — best Arabic ears)" : (enginePref === "groq" ? "whisper-large-v3" : "local whisper (offline)");
   var brain = groqKey ? (agentsDeep ? "GPT-OSS-120B (DEEP)" : "Qwen3-32B (FAST)") : (geminiKey ? "Gemini" : "✂️ basic splitter only");
-  var voice = groqKey ? ("Orpheus — " + VOICES[voxIdx].en + " (EN) / " + VOICES[voxIdx].ar + " (AR)") : "device system voice";
+  var voice = (VOICES[voxIdx].en === "kokoro") ? ("🌌 Kokoro" + (kokoPipe ? " (ready, offline)" : " (not downloaded yet)"))
+    : (groqKey ? ("Orpheus — " + VOICES[voxIdx].en + " (EN) / " + VOICES[voxIdx].ar + " (AR)") : "device system voice");
   $("teamRow").innerHTML = "🤝 <b>YOUR AI TEAM</b> — they pass the work to each other automatically:<br>" +
     "🎧 <b>Ears</b> (the chip above picks one): " + ears + "<br>" +
     "🧠 <b>Brain</b> (needs the gsk_ key): " + brain + "<br>" +
@@ -2102,7 +2119,8 @@ var VOICES = [
   { en: "autumn", ar: "Lulwa"    },
   { en: "austin", ar: "Sultan"   },
   { en: "daniel", ar: "Abdullah" },
-  { en: "troy",   ar: "Aisha"    }
+  { en: "troy",   ar: "Aisha"    },
+  { en: "kokoro", ar: "kokoro" }
 ];
 var voxIdx = 0;
 try{ voxIdx = Math.max(0, Math.min(VOICES.length - 1, parseInt(localStorage.getItem("voiceAlarm_vox") || "0", 10) || 0)); }catch(e){}
@@ -2118,6 +2136,33 @@ function langRuns(text){
   if(cur) runs.push({ ar: !!curAr, txt: cur });
   return runs.filter(function(r){ return /[\u0600-\u06FF\w]/.test(r.txt); });
 }
+var kokoPipe = null;
+function f32ToWavBlob(f32, sr){
+  var n = f32.length, buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf);
+  function ws(o, s){ for(var i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); }
+  ws(0,"RIFF"); v.setUint32(4, 36 + n * 2, true); ws(8,"WAVE"); ws(12,"fmt ");
+  v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,sr,true); v.setUint32(28,sr*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true);
+  ws(36,"data"); v.setUint32(40,n*2,true);
+  for(var i = 0; i < n; i++){ var s2 = Math.max(-1, Math.min(1, f32[i])); v.setInt16(44 + i*2, s2 < 0 ? s2 * 0x8000 : s2 * 0x7FFF, true); }
+  return new Blob([buf], { type: "audio/wav" });
+}
+async function getKokoro(cb){
+  if(kokoPipe) return kokoPipe;
+  var mod = await loadLib();
+  kokoPipe = await mod.pipeline("text-to-speech", "onnx-community/Kokoro-82M-v1.0-ONNX", { dtype: "q8", progress_callback: cb });
+  return kokoPipe;
+}
+async function kokoroSay(text){
+  if(!kokoPipe) aiCard("🌌 Loading natural voice (one-time ~90 MB)…", "free, offline forever after", null);
+  var pipe = await getKokoro(makeProgCb());
+  var out = await pipe(String(text).slice(0, 400));
+  await new Promise(function(res){
+    var a = new Audio(URL.createObjectURL(f32ToWavBlob(out.audio, out.sampling_rate || 24000)));
+    a.onended = res; a.onerror = res; setTimeout(res, 30000);
+    a.play();
+  });
+}
 async function orpheusSay(text, ar){
   var resp = await withTimeout(fetch("https://api.groq.com/openai/v1/audio/speech", {
     method: "POST",
@@ -2125,7 +2170,7 @@ async function orpheusSay(text, ar){
     body: JSON.stringify({
       model: ar ? "canopylabs/orpheus-arabic-saudi" : "canopylabs/orpheus-v1-english",
       voice: ar ? VOICES[voxIdx].ar : VOICES[voxIdx].en,
-      input: String(text).slice(0, 190),
+      input: String(text).slice(0, 190).replace(/[.,;]/g, " "),
       response_format: "wav"
     })
   }), 30000, "tts:timeout");
@@ -2165,8 +2210,9 @@ async function confirmSpeak(text, langAr){
   for(var i = 0; i < runs.length; i++){
     var piece = runs[i].txt.trim().slice(0, 190);
     if(!piece) continue;
-    if(groqKey){ try{ await orpheusSay(piece, runs[i].ar); continue; }catch(e){} }
-    await localSay(piece, runs[i].ar);
+    if(VOICES[voxIdx].en === "kokoro"){ try{ await kokoroSay(piece); continue; }catch(e){} }
+    if(groqKey){ try{ await orpheusSay(piece, false); continue; }catch(e){} }
+    await localSay(piece, false);
   }
 }
 function showResult(ai, srcTag, howText){
@@ -2368,6 +2414,33 @@ async function chatSend(){
 $("chatBtn").onclick = chatSend;
 $("chatIn").addEventListener("keydown", function(e){ if(e.key === "Enter") chatSend(); });
 $("noteSaveChip").onclick = saveTxtNote;
+$("exportChip").onclick = function(){
+  try{
+    var data = { app: "voice-alarm", version: APP_VERSION, when: new Date().toISOString(), tasks: tasks, voiceNotes: vnotes, notes: txtnotes };
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: "application/json" }));
+    a.download = "voice-alarm-backup-" + new Date().toISOString().slice(0, 10) + ".json";
+    a.click(); toast("⬇ Backup downloaded");
+  }catch(e){ toast("⚠ export failed"); }
+};
+$("importChip").onclick = function(){ $("importFile").click(); };
+$("importFile").onchange = function(){
+  var f = this.files && this.files[0]; if(!f) return;
+  var fr = new FileReader();
+  fr.onload = function(){
+    try{
+      var d = JSON.parse(fr.result);
+      if(!d || (!d.tasks && !d.voiceNotes && !d.notes)) throw new Error("not a backup");
+      if(Array.isArray(d.tasks)) localStorage.setItem(KEY, JSON.stringify(d.tasks));
+      if(Array.isArray(d.voiceNotes)) localStorage.setItem(NOTESKEY, JSON.stringify(d.voiceNotes));
+      if(Array.isArray(d.notes)) localStorage.setItem(TXTKEY, JSON.stringify(d.notes));
+      toast("✓ Backup imported — reloading…");
+      setTimeout(function(){ location.reload(); }, 900);
+    }catch(e){ toast("⚠ invalid backup file"); }
+    $("importFile").value = "";
+  };
+  fr.readAsText(f);
+};
 
 /* ============ time status line ============ */
 function updateTimeStatus(){
