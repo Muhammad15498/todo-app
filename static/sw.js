@@ -1,4 +1,4 @@
-const V = "cw-20";
+const V = "cw-21";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

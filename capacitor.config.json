@@ -1,0 +1,11 @@
+{
+  "appId": "app.contextword.reader",
+  "appName": "Context Word",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": true
+  },
+  "server": {
+    "androidScheme": "https"
+  }
+}

@@ -46,7 +46,7 @@ function applyTheme() {
         ? '"Source Serif 4", Georgia, serif'
         : '"Newsreader", Georgia, serif';
   document.documentElement.style.setProperty("--font-read", font);
-  const themeColor = state.settings.theme === "night" ? "#161310" : state.settings.theme === "sepia" ? "#eddcbe" : "#f3ebdd";
+  const themeColor = state.settings.theme === "night" ? "#0c1420" : state.settings.theme === "sepia" ? "#e8eef5" : "#eef2f7";
   const meta = $('meta[name="theme-color"]');
   if (meta) meta.content = themeColor;
 }

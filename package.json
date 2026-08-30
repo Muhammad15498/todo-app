@@ -1,0 +1,10 @@
+{
+  "name": "context-word",
+  "private": true,
+  "version": "21.0.0",
+  "description": "Personal reader — highlight a word, understand the sentence.",
+  "scripts": {
+    "export": "python3 scripts/export_www.py",
+    "apk:sync": "python3 scripts/export_www.py && npx cap sync android"
+  }
+}

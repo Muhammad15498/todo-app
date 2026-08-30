@@ -1,16 +1,16 @@
 :root {
-  --paper: #f3ebdd;
-  --paper-2: #e9dfcd;
-  --ink: #1f1a14;
-  --ink-soft: #5c5348;
-  --rule: #d4c7b0;
-  --accent: #b4442e;
-  --accent-deep: #8c2f1d;
-  --accent-2: #2f5d50;
-  --highlight: #f0d48a;
-  --highlight-strong: rgba(180, 68, 46, 0.2);
-  --panel: #faf6ee;
-  --shadow: 0 18px 50px rgba(31, 26, 20, 0.12);
+  --paper: #eef2f7;
+  --paper-2: #e1e8f0;
+  --ink: #142033;
+  --ink-soft: #4a5a70;
+  --rule: #c5d0de;
+  --accent: #1e4a7a;
+  --accent-deep: #132f54;
+  --accent-2: #3d7ea6;
+  --highlight: #c9daf0;
+  --highlight-strong: rgba(30, 74, 122, 0.22);
+  --panel: #f7f9fc;
+  --shadow: 0 18px 50px rgba(20, 32, 51, 0.12);
   --font-ui: "Outfit", system-ui, sans-serif;
   --font-read: "Newsreader", "Iowan Old Style", Georgia, serif;
   --font-display: "Fraunces", Georgia, serif;
@@ -21,28 +21,28 @@
 }
 
 :root[data-theme="sepia"] {
-  --paper: #eddcbe;
-  --paper-2: #e2ceaa;
-  --ink: #3b2a18;
-  --ink-soft: #6a5438;
-  --rule: #cbb48a;
-  --panel: #f4e6c8;
-  --highlight: #e8c56a;
+  --paper: #e8eef5;
+  --paper-2: #d5e0ec;
+  --ink: #1a2a40;
+  --ink-soft: #4e6178;
+  --rule: #b7c6d6;
+  --panel: #f3f7fb;
+  --highlight: #b9d0ea;
 }
 
 :root[data-theme="night"] {
-  --paper: #161310;
-  --paper-2: #211c17;
-  --ink: #ede6d9;
-  --ink-soft: #a39888;
-  --rule: #3a332c;
-  --accent: #e07a5f;
-  --accent-deep: #c45d42;
-  --accent-2: #7d9b8a;
-  --highlight: #5c4a22;
-  --highlight-strong: rgba(224, 122, 95, 0.28);
-  --panel: #1a1612;
-  --shadow: 0 18px 50px rgba(0, 0, 0, 0.4);
+  --paper: #0c1420;
+  --paper-2: #152033;
+  --ink: #e8eef6;
+  --ink-soft: #9aadc4;
+  --rule: #2a3b52;
+  --accent: #7eb0e0;
+  --accent-deep: #5a92c8;
+  --accent-2: #6aa8c9;
+  --highlight: #1e3a5c;
+  --highlight-strong: rgba(126, 176, 224, 0.28);
+  --panel: #101a28;
+  --shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
 }
 
 * { box-sizing: border-box; }
@@ -91,8 +91,8 @@ a { color: var(--accent); }
   top: auto;
   z-index: 5;
   flex-shrink: 0;
-  background: #b4442e;
-  color: #faf6ee;
+  background: #1e4a7a;
+  color: #f7f9fc;
   text-align: center;
   padding: 0.18rem 0.7rem;
   font-size: 0.68rem;
@@ -179,7 +179,7 @@ a { color: var(--accent); }
 }
 .primary-btn {
   background: var(--accent);
-  color: #faf6ee;
+  color: #f7f9fc;
   border-color: var(--accent);
   padding: 0.7rem 1.15rem;
   font-weight: 500;
@@ -318,9 +318,9 @@ a { color: var(--accent); }
 }
 .card[data-kind="pdf"] { --stripe: var(--accent); }
 .card[data-kind="epub"] { --stripe: var(--accent-2); }
-.card[data-kind="sample"] { --stripe: #c4a35a; }
-.card[data-kind="txt"], .card[data-kind="md"], .card[data-kind="html"] { --stripe: #6b5a4a; }
-.card[data-kind="docx"] { --stripe: #3d5a80; }
+.card[data-kind="sample"] { --stripe: #5b7c99; }
+.card[data-kind="txt"], .card[data-kind="md"], .card[data-kind="html"] { --stripe: #3d5a80; }
+.card[data-kind="docx"] { --stripe: #2f6f9a; }
 .card:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
 .card-kind {
   font-size: 0.68rem;
@@ -533,8 +533,8 @@ a { color: var(--accent); }
   right: 8%;
   bottom: 8%;
   z-index: 3;
-  background: rgba(31, 26, 20, 0.92);
-  color: #faf6ee;
+  background: rgba(12, 20, 32, 0.92);
+  color: #e8eef6;
   padding: 0.8rem 1rem;
   border-radius: 12px;
   font-size: 0.92rem;
@@ -565,7 +565,7 @@ a { color: var(--accent); }
 }
 .pdf-skeleton {
   padding: 8rem 2rem;
-  color: #8a7b68;
+  color: #7a8aa0;
   text-align: center;
   font-family: var(--font-ui);
 }
@@ -589,7 +589,7 @@ a { color: var(--accent); }
   transform-origin: 0% 0%;
   cursor: text;
 }
-.textLayer ::selection { background: rgba(180, 68, 46, 0.28); color: transparent; }
+.textLayer ::selection { background: rgba(30, 74, 122, 0.28); color: transparent; }
 
 .epub-frame {
   height: 100%;
