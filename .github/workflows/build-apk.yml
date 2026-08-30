@@ -20,6 +20,9 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
       - name: Export static app
         run: python3 scripts/export_www.py
 
@@ -29,10 +32,11 @@ jobs:
           npm install --save-dev @capacitor/cli
           npx cap add android
           npx cap sync android
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > android/local.properties
 
       - name: Assemble debug APK
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon
+        run: chmod +x gradlew && ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Rename APK
         run: |
@@ -43,3 +47,4 @@ jobs:
         with:
           name: ContextWord-apk
           path: dist/ContextWord.apk
+          if-no-files-found: error
