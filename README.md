@@ -26,3 +26,4 @@ Keys/notes/recordings stay in this browser's local storage — nothing is sent a
 ## Android APK
 Native audio-first app in [`android/`](android/) (voice-as-alarm, exact alarms, Groq transcription).
 Build free on GitHub Actions (workflow: `gradle assembleDebug` → artifact `app-debug.apk`).
+deploy trigger 21:19:13Z
