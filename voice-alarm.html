@@ -274,11 +274,15 @@
 
     <div class="row" style="margin-top:14px">
       <span class="lbl" style="margin:0">AI ENGINE</span>
-      <button class="chip engine" data-engine="groq">🌐 Groq — FREE, mixed AR/EN ⭐</button>
-      <button class="chip engine" data-engine="gemini">🌐 Gemini — smart notes</button>
-      <button class="chip engine" data-engine="local">💻 Local — offline</button>
-      <button class="chip" id="agentsChip">🤝 Agents: FAST</button>
+      <button class="chip engine" data-engine="groq">🌐 Groq — free, balanced ⭐</button>
+      <button class="chip engine" data-engine="gemini">🎧 Gemini — best Arabic ears</button>
+      <button class="chip engine" data-engine="local">💻 Local — offline, private</button>
     </div>
+    <details id="advBox" style="margin-top:10px">
+      <summary class="lbl" style="cursor:pointer">⚙ Advanced — rarely needed</summary>
+      <div class="row" style="margin-top:8px">
+        <button class="chip" id="agentsChip">🤝 Agents: FAST</button>
+      </div>
     <div class="dm" id="teamRow" style="margin-top:8px;padding:8px 12px;background:#f6f8fa;border-radius:10px;font-size:.85rem;line-height:1.6"></div>
     <div id="keyRow" style="display:none; margin-top:8px">
       <div class="row">
@@ -295,6 +299,7 @@
       <button class="chip model" data-model="tiny">⚡ Tiny — fastest</button>
     </div>
     <div class="hint" id="modelHint" style="margin-top:6px">Small ≈ 250 MB · Base ≈ 75 MB · Tiny ≈ 40 MB — downloaded once, then cached. Local runs on your CPU (slow but private &amp; offline). Cloud finishes everything in seconds.</div>
+    </details>
 
     <div class="row" id="vlangRow" style="margin-top:10px">
       <span class="lbl" style="margin:0">🎙 SPEECH LANGUAGE (for recording):</span>
@@ -356,11 +361,26 @@
   <div class="card" id="resCard" style="display:none">
     <div class="lbl">📝 Transcript &amp; AI result — <span id="resEngine" style="font-weight:400"></span>
       <button class="x" id="speakChip" style="float:right" title="voice replies on/off">🔊</button>
-      <button class="x" id="voxChip" style="float:right;margin-right:4px" title="change AI voice">🎭</button></div>
-    <div class="dm" id="resTrans" style="white-space:pre-wrap;background:#f6f8fa;border-radius:8px;padding:8px 10px;margin:6px 0"></div>
+      <button class="x" id="voxChip" style="float:right;margin-right:4px" title="change AI voice">🎭</button>
+      <button class="x" id="noteSaveChip" style="float:right;margin-right:4px" title="save as note">🗒</button></div>
+    <textarea id="resTrans" rows="3" class="dm" style="width:100%;box-sizing:border-box;background:#f6f8fa;border:1px solid var(--line2);border-radius:8px;padding:8px 10px;margin:6px 0;color:var(--text);font:inherit;resize:vertical"></textarea>
     <div class="dm" id="resSum" style="font-style:italic;color:#495057;white-space:pre-wrap"></div>
     <div class="dm" id="resTime" style="color:#0b7285"></div>
     <div class="dm" id="resOrg" style="white-space:pre-wrap;margin-top:6px"></div>
+    <div style="margin-top:10px;border-top:1px dashed var(--line2);padding-top:8px">
+      <div class="lbl">💬 Ask the AI about this note — thoughts, organize, plan, guide</div>
+      <div id="chatLog" class="dm" style="max-height:220px;overflow:auto;background:#f6f8fa;border-radius:8px;padding:8px 10px;margin:6px 0;white-space:pre-wrap"></div>
+      <div class="row">
+        <input type="text" id="chatIn" placeholder="what should I do first? / summarize this / plan my week…" style="flex:1;min-width:200px;background:#fbfcfe;border:1px solid var(--line2);color:var(--text);border-radius:12px;padding:9px 12px;font-size:.9rem">
+        <button class="chip" id="chatBtn">➤</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SAVED NOTES -->
+  <div class="card">
+    <div class="lbl">🗒 Saved notes — tap 💬 to discuss one with the AI</div>
+    <div id="txtNotesList"></div>
   </div>
 
   <!-- VOICE NOTES LIBRARY -->
@@ -1067,7 +1087,7 @@ function startRecognition(onInterim, onFinal, onErr){
   return r;
 }
 var IS_MOBILE = /Android|iPhone|iPad|Mobi/i.test(navigator.userAgent || "");
-var APP_VERSION = "v33";
+var APP_VERSION = "v34";
 function micState(cb){
   if(navigator.permissions && navigator.permissions.query){
     navigator.permissions.query({name:"microphone"}).then(function(p){ cb(p.state); }).catch(function(){ cb("unknown"); });
@@ -1628,7 +1648,8 @@ function geminiPrompt(withAudio){
     " (timezone " + (Intl.DateTimeFormat().resolvedOptions().timeZone || "local") + "). Compute delay_seconds from THIS moment.\n" +
     "Return ONLY minified JSON with these keys:\n" +
     "\"transcript\": verbatim transcript of what was said (keep original language(s)),\n" +
-    "\"summary\": 1-3 ultra-short bullet points, each on its own line starting with \"• \", in the speaker's language mix,\n" +
+    "\"summary\": bullet points in ENGLISH, THIRD PERSON about the speaker ('He will…', 'He needs…'), one bullet per distinct point — cover EVERYTHING said, as many as needed (up to 8); each line starts with \"• \",\n" +
+    "\"spoken_confirm_en\": ONE short spoken line in ENGLISH (max 22 words), third person, saying what was understood and when it rings (e.g. \"He wants a timer for the bank call in five minutes.\"),\n" +
     "\"reminders\": array of 1-4 objects, one PER distinct reminder request — every explicit فكرني/remind me marker starts its own entry carrying only the note-part it belongs to; a single unmarked note = exactly one entry. Each object: {\"title\": core commitment 3-7 words in the note's language, \"bullets\": 1-5 rewritten clean points, \"delay_seconds\": per-entry seconds, \"quoted_time\": per-entry bool},\n" +
     "\"bullets\": array of 1-5 REWRITTEN notes — never copy the speaker's sentences; compress each distinct thought to its essence (max ~10 words, imperative form: \"Send X\", \"Check Y\"); merge duplicates and related items into one; drop filler, hesitations, meta-talk about apps/processes/deadline talk that is not a task; keep the speaker's language; [] if the note is one simple thought,\n" +
     "\"delay_seconds\": integer seconds from NOW until the reminder should ring, parsed from ANY time mention, including typos, half-words and Egyptian/colloquial Arabic: exact (\"at 9pm\", \"الساعة ٩ مسا\", \"tomorrow morning\") or fuzzy (\"in a bit/soon/then\"=300, \"بعد شوية/كمان شوية/شويتين\"=300, \"كمان خمساية/كمان خمسة\"=300, \"خمس دقايق كدا\"=300, \"in a couple of minutes\"=120, \"a few minutes\"=180, \"some minutes\"=600, \"half an hour\"=1800, \"نص ساعة\"=1800, \"later/بعدين\"=3600). IMPORTANT INTENT RULES: (1) count a time ONLY if the speaker PERSONALLY wants a reminder/plan/event at that time (first-person: فكرني، لازم، عندي، هعمل، I should, remind me, meeting at X). Time inside narrated/quoted speech (وهو قاللى اصبر كمان شوية، he told me to wait) → delay_seconds=null AND quoted_time=true. (2) EXCEPTION: if the speaker explicitly closes the note (or a part of it) with فكرني / ذكرني / remind me (e.g. ending with «فكرني بها»), that time IS intentional → set the real delay even if it was narrated. (3) Multiple فكرني/remind me markers = multiple reminders array entries, each with its own time." +
@@ -1732,8 +1753,9 @@ function sanitizeAi(obj, fallbackText){
       whenText: cl.text
     });
   }
-  var summary = String((obj && obj.summary) || "").trim().slice(0, 200);
-  return { transcript: cl.text, reminders: rems.slice(0, 4), cleaned: cl.cleaned, summary: summary };
+  var summary = String((obj && obj.summary) || "").trim().slice(0, 600);
+  var spoken = String((obj && obj.spoken_confirm_en) || "").trim().slice(0, 190);
+  return { transcript: cl.text, reminders: rems.slice(0, 4), cleaned: cl.cleaned, summary: summary, spoken: spoken };
 }
 var AGTKEY = "voiceAlarm_agents", agentsDeep = false;
 try{ agentsDeep = localStorage.getItem(AGTKEY) === "1"; }catch(e){}
@@ -1919,11 +1941,9 @@ function finalizePipeline(ai, srcTag){
     made++;
   });
   showResult(ai, srcTag, "⏱ " + firstHow + failNote);
-  var arNote = /[\u0600-\u06FF]/.test(ai.transcript || "");
-  var tTxt = firstPhrase || ("after " + fmtDur(Math.max(0, firstDue - Date.now())));
-  var spokenCore = (ai.summary || firstTitle);
-  confirmSpeak(arNote ? ("تمام، فهمتك. " + spokenCore + "، هفكرك " + tTxt + ".")
-                      : ("Got it. " + spokenCore + " I'll remind you " + tTxt + "."), arNote);
+  /* v34: the AI voice ALWAYS speaks ENGLISH, 3rd person, whatever language he spoke */
+  var enWhen = "in " + fmtDur(Math.max(0, firstDue - Date.now()));
+  confirmSpeak((ai && ai.spoken) || ("He wants: " + (firstTitle || "a reminder") + ", " + enWhen + "."), false);
   toast("🚀 Auto-started " + made + " reminder" + (made > 1 ? "s" : "") + " (" + firstHow + ")");
   currentAudio = null; manualDue = null; spacedOn = false;
   $("spacedChip").classList.remove("on");
@@ -2152,8 +2172,9 @@ async function confirmSpeak(text, langAr){
 function showResult(ai, srcTag, howText){
   var rc = $("resCard"); if(!rc) return;
   rc.style.display = "block";
+  lastAI = ai || {};
   $("resEngine").textContent = SRC_LABEL[srcTag] || srcTag || "—";
-  $("resTrans").textContent = (ai && ai.transcript) || EMPTY_TXT;
+  $("resTrans").value = (ai && ai.transcript) || EMPTY_TXT;
   $("resSum").textContent = (ai && ai.summary) ? ("🧠 " + ai.summary) : "";
   $("resTime").textContent = howText || "";
   var rems = (ai && ai.reminders) || [];
@@ -2267,6 +2288,86 @@ function renderNotes(){
     };
   });
 }
+
+/* ============ saved notes + AI CHAT (V4) ============ */
+var TXTKEY = "voiceAlarm_txtnotes_v1", txtnotes = [], lastAI = {}, chatHist = [];
+try{ txtnotes = JSON.parse(localStorage.getItem(TXTKEY) || "[]"); }catch(e){ txtnotes = []; }
+function renderTxtNotes(){
+  var host = $("txtNotesList");
+  if(!txtnotes.length){ host.innerHTML = "<div class='empty'>Notes you save (🗒 in the transcript card) land here — transcript + AI bullets together.</div>"; return; }
+  host.innerHTML = txtnotes.map(function(n){
+    return "<div class='dayItem' style='margin-bottom:8px'>" +
+      "<div class='row' style='justify-content:space-between'><div class='dm' style='margin:0;color:#868e96;font-size:.8rem'>" + new Date(n.ts).toLocaleString() + "</div>" +
+      "<div class='row'><button class='x' data-tchat='" + n.id + "'>💬</button><button class='x' data-tdel='" + n.id + "'>✖</button></div></div>" +
+      "<div class='dm' style='white-space:pre-wrap'>" + esc(String(n.text || "").slice(0, 500)) + "</div>" +
+      (n.summary ? "<div class='dm' style='font-style:italic;white-space:pre-wrap'>🧠 " + esc(n.summary) + "</div>" : "") +
+    "</div>";
+  }).join("");
+  host.querySelectorAll("[data-tdel]").forEach(function(b){
+    b.onclick = function(){ txtnotes = txtnotes.filter(function(x){ return x.id !== b.getAttribute("data-tdel"); });
+      try{ localStorage.setItem(TXTKEY, JSON.stringify(txtnotes)); }catch(e){} renderTxtNotes(); };
+  });
+  host.querySelectorAll("[data-tchat]").forEach(function(b){
+    b.onclick = function(){
+      var n = null; txtnotes.forEach(function(x){ if(x.id === b.getAttribute("data-tchat")) n = x; });
+      if(!n) return;
+      chatHist = [];
+      showResult({ transcript: n.text, summary: n.summary, reminders: [] }, "note", "saved note loaded — ask the AI below");
+      $("resCard").scrollIntoView({behavior:"smooth"});
+    };
+  });
+}
+function saveTxtNote(){
+  var body = $("resTrans").value.trim();
+  if(!body){ toast("⚠ nothing to save"); return; }
+  txtnotes.unshift({ id: "t" + Date.now(), ts: Date.now(), text: body, summary: (lastAI && lastAI.summary) || "" });
+  try{ localStorage.setItem(TXTKEY, JSON.stringify(txtnotes.slice(0, 100))); }catch(e){}
+  renderTxtNotes(); toast("🗒 Note saved");
+}
+async function groqChat(userText){
+  var msgs = [
+    { role: "system", content: "You are the user's personal voice-note assistant. The user is an Egyptian man who mixes Arabic and English naturally. ALWAYS reply in ENGLISH. Refer to him in the THIRD PERSON ('he should…', 'he wants…'). Be concise, practical: analyze, organize, give thoughts, plan, guide. If his message mentions a time or alarm, acknowledge it briefly - the app arms the timer itself." },
+    { role: "system", content: "NOTE TRANSCRIPT:\n" + String($("resTrans").value || "").slice(0, 1200) + "\nAI SUMMARY:\n" + String((lastAI && lastAI.summary) || "") }
+  ].concat(chatHist.slice(-8));
+  var resp = await withTimeout(fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: { "Authorization": "Bearer " + groqKey, "Content-Type": "application/json" },
+    body: JSON.stringify({ model: agentsDeep ? "openai/gpt-oss-120b" : "qwen/qwen3-32b", temperature: 0.4, messages: msgs })
+  }), 45000, "chat:timeout");
+  if(!resp.ok) throw new Error("http " + resp.status + " " + (await resp.text()).slice(0, 100));
+  var data = await resp.json();
+  var out = String((data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || "").trim();
+  if(!out) throw new Error("empty reply");
+  return out;
+}
+function chatRender(){
+  $("chatLog").innerHTML = chatHist.slice(-12).map(function(m){
+    return "<div style='margin:4px 0'><b>" + (m.role === "user" ? "🧑" : "🤖") + ":</b> " + esc(String(m.content).slice(0, 900)) + "</div>";
+  }).join("");
+  $("chatLog").scrollTop = 99999;
+}
+async function chatSend(){
+  var t = $("chatIn").value.trim(); if(!t) return;
+  $("chatIn").value = "";
+  chatHist.push({ role: "user", content: t }); chatRender();
+  if(!groqKey){
+    chatHist.push({ role: "assistant", content: "I need the free Groq key (gsk_) to think — paste it up in AI ENGINE, then ask me again." });
+    chatRender();
+  } else {
+    try{ var r = await groqChat(t); chatHist.push({ role: "assistant", content: r }); chatRender(); confirmSpeak(r.slice(0, 180), false); }
+    catch(e){ chatHist.push({ role: "assistant", content: "⚠ " + String(e.message || e).slice(0, 120) }); chatRender(); }
+  }
+  /* referee: a time mentioned in CHAT arms a timer too, any language mix */
+  var w = parseWhen(t);
+  if(w){
+    addTask(t.slice(0, 60), "", w.dueAt, null, {auto3s: false, spaced: false});
+    chatHist.push({ role: "assistant", content: "⏱ Timer armed: rings " + fmtDur(w.dueAt - Date.now()) + " from now «" + (w.phrase || "") + "»" });
+    chatRender(); toast("⏱ Timer armed from chat");
+  }
+}
+$("chatBtn").onclick = chatSend;
+$("chatIn").addEventListener("keydown", function(e){ if(e.key === "Enter") chatSend(); });
+$("noteSaveChip").onclick = saveTxtNote;
 
 /* ============ time status line ============ */
 function updateTimeStatus(){
@@ -2543,6 +2644,7 @@ load();
 loadHist();
 renderNotes();
 updateTeam();
+renderTxtNotes();
 if(calY == null){ var _n = new Date(); calY = _n.getFullYear(); calM = _n.getMonth(); selDay = dayKey(Date.now()); }
 render();
 renderHist();
