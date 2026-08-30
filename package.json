@@ -5,6 +5,7 @@
   "description": "Personal reader — highlight a word, understand the sentence.",
   "scripts": {
     "export": "python3 scripts/export_www.py",
-    "apk:sync": "python3 scripts/export_www.py && npx cap sync android"
+    "apk:sync": "python3 scripts/export_www.py && npx cap sync android",
+    "postinstall": "bash scripts/ensure-android-sdk.sh"
   }
 }
