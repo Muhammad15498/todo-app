@@ -357,6 +357,7 @@
       <button class="x" id="speakChip" style="float:right" title="voice replies on/off">🔊</button>
       <button class="x" id="voxChip" style="float:right;margin-right:4px" title="change AI voice">🎭</button></div>
     <div class="dm" id="resTrans" style="white-space:pre-wrap;background:#f6f8fa;border-radius:8px;padding:8px 10px;margin:6px 0"></div>
+    <div class="dm" id="resSum" style="font-style:italic;color:#495057"></div>
     <div class="dm" id="resTime" style="color:#0b7285"></div>
     <div class="dm" id="resOrg" style="white-space:pre-wrap;margin-top:6px"></div>
   </div>
@@ -1065,7 +1066,7 @@ function startRecognition(onInterim, onFinal, onErr){
   return r;
 }
 var IS_MOBILE = /Android|iPhone|iPad|Mobi/i.test(navigator.userAgent || "");
-var APP_VERSION = "v30";
+var APP_VERSION = "v31";
 function micState(cb){
   if(navigator.permissions && navigator.permissions.query){
     navigator.permissions.query({name:"microphone"}).then(function(p){ cb(p.state); }).catch(function(){ cb("unknown"); });
@@ -1624,6 +1625,7 @@ function geminiPrompt(withAudio){
     " (timezone " + (Intl.DateTimeFormat().resolvedOptions().timeZone || "local") + "). Compute delay_seconds from THIS moment.\n" +
     "Return ONLY minified JSON with these keys:\n" +
     "\"transcript\": verbatim transcript of what was said (keep original language(s)),\n" +
+    "\"summary\": one-sentence summary of what the speaker wants, in the note's language,\n" +
     "\"reminders\": array of 1-4 objects, one PER distinct reminder request — every explicit فكرني/remind me marker starts its own entry carrying only the note-part it belongs to; a single unmarked note = exactly one entry. Each object: {\"title\": core commitment 3-7 words in the note's language, \"bullets\": 1-5 rewritten clean points, \"delay_seconds\": per-entry seconds, \"quoted_time\": per-entry bool},\n" +
     "\"bullets\": array of 1-5 REWRITTEN notes — never copy the speaker's sentences; compress each distinct thought to its essence (max ~10 words, imperative form: \"Send X\", \"Check Y\"); merge duplicates and related items into one; drop filler, hesitations, meta-talk about apps/processes/deadline talk that is not a task; keep the speaker's language; [] if the note is one simple thought,\n" +
     "\"delay_seconds\": integer seconds from NOW until the reminder should ring, parsed from ANY time mention, including typos, half-words and Egyptian/colloquial Arabic: exact (\"at 9pm\", \"الساعة ٩ مسا\", \"tomorrow morning\") or fuzzy (\"in a bit/soon/then\"=300, \"بعد شوية/كمان شوية/شويتين\"=300, \"كمان خمساية/كمان خمسة\"=300, \"خمس دقايق كدا\"=300, \"in a couple of minutes\"=120, \"a few minutes\"=180, \"some minutes\"=600, \"half an hour\"=1800, \"نص ساعة\"=1800, \"later/بعدين\"=3600). IMPORTANT INTENT RULES: (1) count a time ONLY if the speaker PERSONALLY wants a reminder/plan/event at that time (first-person: فكرني، لازم، عندي، هعمل، I should, remind me, meeting at X). Time inside narrated/quoted speech (وهو قاللى اصبر كمان شوية، he told me to wait) → delay_seconds=null AND quoted_time=true. (2) EXCEPTION: if the speaker explicitly closes the note (or a part of it) with فكرني / ذكرني / remind me (e.g. ending with «فكرني بها»), that time IS intentional → set the real delay even if it was narrated. (3) Multiple فكرني/remind me markers = multiple reminders array entries, each with its own time." +
@@ -1727,7 +1729,8 @@ function sanitizeAi(obj, fallbackText){
       whenText: cl.text
     });
   }
-  return { transcript: cl.text, reminders: rems.slice(0, 4), cleaned: cl.cleaned };
+  var summary = String((obj && obj.summary) || "").trim().slice(0, 200);
+  return { transcript: cl.text, reminders: rems.slice(0, 4), cleaned: cl.cleaned, summary: summary };
 }
 var AGTKEY = "voiceAlarm_agents", agentsDeep = false;
 try{ agentsDeep = localStorage.getItem(AGTKEY) === "1"; }catch(e){}
@@ -1769,7 +1772,13 @@ async function groqTranscribe(dataUrl){
   aiCard("🌐 Groq Whisper: transcribing your recording…", "mixed Arabic/English handled natively — seconds", null);
   var mime = (currentAudio && currentAudio.mime) || "audio/webm";
   var ext = /ogg/.test(mime) ? "ogg" : (/mp4/.test(mime) ? "m4a" : (/wav/.test(mime) ? "wav" : "webm"));
-  var blob = new Blob([dataUrlToArrayBuffer(dataUrl)], { type: mime });
+  var blob;
+  try{
+    /* v31: resample to clean 16k-mono WAV first - same prep Gemini gets. Raw phone webm confuses whisper */
+    var prepG = await audioTo16kMono(dataUrl);
+    blob = new Blob([dataUrlToArrayBuffer("data:audio/wav;base64," + b64Wav16k(prepG.audio))], { type: "audio/wav" });
+    mime = "audio/wav"; ext = "wav";
+  }catch(e){ blob = new Blob([dataUrlToArrayBuffer(dataUrl)], { type: mime }); }
   var fd = new FormData();
   fd.append("file", new File([blob], "note." + ext, { type: mime }));
   fd.append("model", "whisper-large-v3");
@@ -1790,48 +1799,39 @@ async function groqTranscribe(dataUrl){
   var cl = collapseLoops(text);
   text = cl.text;
   if(!text) throw new Error("empty-transcript");
-  lastOrgFail = "";
-  if(groqKey){
-    /* Qwen3 (FAST) / GPT-OSS-120B (DEEP) on the SAME key: analyzing/parsing/organizing */
-    try{
-      var ai2 = await groqAnalyzeText(text);
-      finalizePipeline(ai2, "groq+ai");
-      return;
-    }catch(e){ lastOrgFail = String(e.message || e).slice(0, 90); }
-  } else if(geminiKey){
-    try{
-      var ai = await geminiAnalyzeText(text);
-      finalizePipeline(ai, "groq+ai");
-      return;
-    }catch(e){ lastOrgFail = String(e.message || e).slice(0, 90); }
-  }
-  finalizePipeline({ transcript: text, reminders: splitReminders(text), cleaned: cl.cleaned }, "groq");
-  aiCard("✓ Groq done" + (cl.cleaned ? " · repetition cleaned" : ""), "", 100, "ok");
-  setTimeout(aiCardHideIfDone, 4000);
+  aiCard("✓ Ears done" + (cl.cleaned ? " · repetition cleaned" : ""), "thinking…", 100, "ok");
+  await analyzeArm(text, cl.cleaned, "groq");
 }
+/* ---- SHARED BRAIN: any ears -> best brain (Groq first, Gemini text fallback) ---- */
+async function analyzeArm(text, cleaned, earTag){
+  lastOrgFail = "";
+  var ai = null, tag = earTag;
+  aiCard("🤝 Brain: understanding, parsing times, summarizing…", (groqKey ? "Qwen3 / GPT-OSS" : "Gemini") + " — free", null);
+  if(groqKey){
+    try{ ai = await groqAnalyzeText(text); tag = earTag + "+ai"; }
+    catch(e){ lastOrgFail = String(e.message || e).slice(0, 90); }
+  } else if(geminiKey){
+    try{ ai = await geminiAnalyzeText(text); tag = earTag + "+ai"; }
+    catch(e){ lastOrgFail = String(e.message || e).slice(0, 90); }
+  }
+  if(!ai) ai = { transcript: text, reminders: splitReminders(text), cleaned: cleaned };
+  else ai.cleaned = ai.cleaned || cleaned;
+  finalizePipeline(ai, tag);
+}
+
 async function geminiDirect(dataUrl){
-  aiCard("🎵 Preparing your recording…", "", null);
+  /* v31 DUAL-BRAIN: Gemini = EARS ONLY (verbatim, dialect-friendly). The brain runs in analyzeArm. */
+  aiCard("🎧 Gemini ears: listening…", "verbatim, dialect-friendly", null);
   var prep = await audioTo16kMono(dataUrl);
   var wav = b64Wav16k(prep.audio);
-  var obj;
-  if(agentsDeep){
-    /* Agent 1: listen (audio) — Agent 2: think (text) */
-    aiCard("🤝 Agent 1/2: Transcriber listening…", "cloud, seconds", null);
-    var a = await callGemini(promptTranscribe(), wav, "audio/wav");
-    aiCard("🤝 Agent 2/2: Organizer thinking…", "reviewing transcript + re-checking time", null);
-    var t = String(a && a.transcript || "");
-    var b = await callGemini(promptOrganize(t), null, null);
-    obj = { transcript: t,
-            reminders: (b && Array.isArray(b.reminders) && b.reminders.length) ? b.reminders
-              : [{ title: b && b.title, bullets: b && b.bullets, delay_seconds: (b && b.delay_seconds != null) ? b.delay_seconds : (a && a.delay_seconds), quoted_time: !!(b && b.quoted_time) || !!(a && a.quoted_time) }] };
-  } else {
-    aiCard("🌐 Gemini: transcribing + analyzing…", "one fast call", null);
-    obj = await callGemini(geminiPrompt(true), wav, "audio/wav");
-  }
-  var ai = sanitizeAi(obj, "");
-  aiCard("✓ Cloud AI done" + (agentsDeep ? " (2 agents)" : "") + (ai.cleaned ? " · repetition cleaned" : ""), "", 100, "ok");
-  finalizePipeline(ai, "gemini");
+  var a = await callGemini(promptTranscribe(), wav, "audio/wav");
+  var text = String((a && a.transcript) || "").trim();
+  var cl = collapseLoops(text);
+  text = cl.text;
+  if(!text) throw new Error("empty-transcript");
+  await analyzeArm(text, cl.cleaned, "gemini");
 }
+
 async function geminiAnalyzeText(text){
   var obj = await callGemini(geminiPrompt(false) + text, null, null);
   return sanitizeAi(obj, text);
@@ -1863,27 +1863,12 @@ async function localWhisper(dataUrl){
   var cl = collapseLoops(text);
   text = cl.text;
   if(!text) throw new Error("empty-transcript");
-  aiCard("✓ Transcribed (local)" + (cl.cleaned ? " · repetition loop cleaned" : ""), geminiKey ? "organizing with Gemini…" : "", 100, "ok");
-  if(geminiKey){
-    try{
-      var ai = await geminiAnalyzeText(text);
-      finalizePipeline(ai, "localai");
-      return;
-    }catch(e){ aiCard("⚠ Gemini organize failed — using built-in organizer", String(e.message || e).slice(0, 140)); }
-  }
-  if(groqKey){
-    try{
-      var ai2 = await groqAnalyzeText(text);
-      finalizePipeline(ai2, "localai");
-      return;
-    }catch(e){ aiCard("⚠ Llama organize failed — using built-in organizer", String(e.message || e).slice(0, 120)); }
-  }
-  var rems = splitReminders(text);
-  finalizePipeline({ transcript: text, reminders: rems, cleaned: cl.cleaned }, "rule");
+  aiCard("✓ Transcribed (local)" + (cl.cleaned ? " · repetition loop cleaned" : ""), "thinking…", 100, "ok");
+  await analyzeArm(text, cl.cleaned, "localai");
 }
 
 /* ---- finalize: organize fields + AUTO-PILOT (start countdown automatically) ---- */
-var SRC_LABEL = { gemini:"🌐 Gemini (cloud AI)", localai:"💻 local audio + 🌐 AI notes", groq:"🌐 Groq Whisper (mixed AR/EN)", "groq+ai":"🌐 Groq whisper-large-v3 + 🤖 Qwen3/GPT-OSS (free)", rule:"✂️ basic splitter — add a free Groq/Gemini key for AI notes" };
+var SRC_LABEL = { gemini:"🎧 Gemini ears → ✂️ basic splitter", localai:"💻 local whisper → ✂️ basic splitter", groq:"🎧 whisper-large-v3 → ✂️ basic splitter", "groq+ai":"🎧 whisper-large-v3 → 🤖 Qwen3/GPT-OSS · ✓cross-checked", "gemini+ai":"🎧 Gemini ears → 🤖 Qwen3/GPT-OSS · ✓cross-checked", "localai+ai":"💻 local whisper → 🤖 Qwen3/GPT-OSS · ✓cross-checked", rule:"✂️ basic splitter — add a free Groq key for the AI brain" };
 function finalizePipeline(ai, srcTag){
   try{
     if(lastNote && ai && ai.transcript){
@@ -1915,9 +1900,16 @@ function finalizePipeline(ai, srcTag){
   rems.forEach(function(r){
     var dueAt, auto3s = false, how;
     var w = parseWhen(r.whenText || (r.title + " " + r.bullets.join(" ")), {ignoreNarration: explicitTail});
-    if(r.delay != null){ dueAt = Date.now() + r.delay * 1000; how = "AI time" + (r.quoted ? " (quoted → default)" : ""); }
-    else if(w){ dueAt = w.dueAt; how = (explicitTail ? "confirmed by فكرني" : "detected") + (w.phrase ? ": «" + w.phrase + "»" : ""); }
-    else { dueAt = Date.now() + 3000; auto3s = true; how = "no time → 3s"; }
+    var aiSec = r.delay, wSec = w ? Math.round((w.dueAt - Date.now()) / 1000) : null;
+    if(aiSec != null && wSec != null && wSec > 0){
+      var close = Math.abs(aiSec - wSec) <= Math.max(5, 0.25 * Math.max(aiSec, wSec));
+      dueAt = Date.now() + aiSec * 1000;
+      how = close ? "✓ 2-of-2 agree: " + aiSec + "s (AI + parser)"
+                  : "AI " + aiSec + "s vs literal «" + (w.phrase || "") + "» " + wSec + "s → used AI understanding";
+    }
+    else if(aiSec != null){ dueAt = Date.now() + aiSec * 1000; how = "AI understood" + (r.quoted ? " (quoted → default)" : ""); }
+    else if(w){ dueAt = w.dueAt; how = (explicitTail ? "confirmed by فكرني" : "parser caught") + (w.phrase ? ": «" + w.phrase + "»" : ""); }
+    else { dueAt = Date.now() + defSec() * 1000; auto3s = true; how = "no time found → " + defSec() + "s (test default)"; }
     addTask(r.title, r.bullets.join("\n"), dueAt, made === 0 ? currentAudio : null, {auto3s: auto3s, spaced: spacedOn});
     if(made === 0){ firstHow = how + ": alarm in " + fmtDur(dueAt - Date.now());
       firstTitle = r.title; firstDue = dueAt; firstPhrase = (w && w.phrase) ? w.phrase : ""; }
@@ -1926,8 +1918,9 @@ function finalizePipeline(ai, srcTag){
   showResult(ai, srcTag, "⏱ " + firstHow + failNote);
   var arNote = /[\u0600-\u06FF]/.test(ai.transcript || "");
   var tTxt = firstPhrase || ("after " + fmtDur(Math.max(0, firstDue - Date.now())));
-  confirmSpeak(arNote ? ("تمام، فهمتك. هفكرك: " + firstTitle + "، " + tTxt + ".")
-                      : ("Got it. I'll remind you: " + firstTitle + ", " + tTxt + "."), arNote);
+  var spokenCore = (ai.summary || firstTitle);
+  confirmSpeak(arNote ? ("تمام، فهمتك. " + spokenCore + "، هفكرك " + tTxt + ".")
+                      : ("Got it. " + spokenCore + " I'll remind you " + tTxt + "."), arNote);
   toast("🚀 Auto-started " + made + " reminder" + (made > 1 ? "s" : "") + " (" + firstHow + ")");
   currentAudio = null; manualDue = null; spacedOn = false;
   $("spacedChip").classList.remove("on");
@@ -2051,6 +2044,16 @@ $("voxChip").onclick = function(){
   toast("🎭 AI voice " + (voxIdx + 1) + "/" + VOICES.length + ": " + VOICES[voxIdx].en + " (EN) · " + VOICES[voxIdx].ar + " (AR)");
   confirmSpeak("تمام، هفكرك.", true);
 };
+var DEFKEY = "voiceAlarm_defaultSec", defSecVal = 2;
+try{ defSecVal = Math.max(1, parseInt(localStorage.getItem(DEFKEY) || "2", 10) || 2); }catch(e){}
+function defSec(){ return defSecVal; }
+$("resTime").onclick = function(){
+  if(String($("resTime").textContent).indexOf("test default") < 0) return;
+  var v = parseInt(prompt("When NO time is understood, ring after (seconds):", defSecVal), 10);
+  if(v > 0){ defSecVal = v; try{ localStorage.setItem(DEFKEY, String(v)); }catch(e){}
+    toast("⏱ no-time default = " + v + "s");
+    $("resTime").textContent = String($("resTime").textContent).replace(/\d+s \(test default\)/, v + "s (test default)"); }
+};
 $("speakChip").onclick = function(){
   voiceReplyOn = !voiceReplyOn;
   try{ localStorage.setItem("voiceAlarm_voiceReply", voiceReplyOn ? "1" : "0"); }catch(e){}
@@ -2110,6 +2113,7 @@ function showResult(ai, srcTag, howText){
   rc.style.display = "block";
   $("resEngine").textContent = SRC_LABEL[srcTag] || srcTag || "—";
   $("resTrans").textContent = (ai && ai.transcript) || EMPTY_TXT;
+  $("resSum").textContent = (ai && ai.summary) ? ("🧠 " + ai.summary) : "";
   $("resTime").textContent = howText || "";
   var r0 = ai && ai.reminders && ai.reminders[0];
   $("resOrg").textContent = r0 ? ("▸ " + r0.title + ((r0.bullets && r0.bullets.length) ? "\n" + r0.bullets.map(function(b){ return "• " + b; }).join("\n") : "")) : "";
@@ -2400,7 +2404,7 @@ $("addBtn").onclick = function(){
   var dueAt, auto3s = false;
   if(when){ dueAt = when.dueAt; }
   else if(manualDue){ dueAt = manualDue; }
-  else { dueAt = Date.now() + 3000; auto3s = true; }
+  else { dueAt = Date.now() + defSec() * 1000; auto3s = true; }
   /* organized output (edited or auto) */
   fillOrganized(false);
   var title = $("orgTitle").value.trim();
