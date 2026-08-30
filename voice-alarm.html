@@ -550,7 +550,7 @@ function parseWhen(raw, opts){
   var src = p;
   var s = p.toLowerCase();
   var m;
-  m = s.match(/(?:\bin\b|\bafter\b|بعد|خلال)\s*(\d+(?:\.\d+)?)\s*(seconds?|secs?|s\b|minutes?|mins?|m\b|hours?|hrs?|h\b|ثانية|ثواني|ثوانٍ|ثوان|دقيقة|دقائق|ساعة|ساعات|س\b|د\b|يوم|ايام|أيام)/);
+  m = s.match(/(?:\bin\b|\bafter\b|بعد|خلال|كمان)\s*(\d+(?:\.\d+)?)\s*(seconds?|secs?|s\b|minutes?|mins?|m\b|hours?|hrs?|h\b|ثانية|ثواني|ثوانٍ|ثوان|دقيقة|دقائق|ساعة|ساعات|س\b|د\b|يوم|ايام|أيام)/);
   if(m){ var ms = unitToMs(parseFloat(m[1]), m[2]); if(ms && narratedOK(src, m[0], opts)) return {dueAt: Date.now()+ms, phrase:m[0]}; }
   m = s.match(/\b(\d+)\s*(seconds?|secs?|minutes?|mins?|hours?|hrs?|days?)\b/);
   if(m){
@@ -1066,7 +1066,7 @@ function startRecognition(onInterim, onFinal, onErr){
   return r;
 }
 var IS_MOBILE = /Android|iPhone|iPad|Mobi/i.test(navigator.userAgent || "");
-var APP_VERSION = "v31";
+var APP_VERSION = "v32";
 function micState(cb){
   if(navigator.permissions && navigator.permissions.query){
     navigator.permissions.query({name:"microphone"}).then(function(p){ cb(p.state); }).catch(function(){ cb("unknown"); });
@@ -1620,7 +1620,7 @@ async function discoverModels(){
 }
 function geminiPrompt(withAudio){
   return "You process a personal voice note (" + (withAudio ? "audio attached" : "transcript below") +
-    "). It may be Arabic, English, or mixed.\n" +
+    "). The speaker CODE-SWITCHES naturally: Egyptian Arabic base with English words embedded (timer, alarm, reminder, meeting, deadline, following…). Treat the mix as ONE language — never translate it away. Time phrases may straddle both languages («كمان 3 seconds», «after شوية», «حط alarm بعد 5 minutes»). Titles/bullets/summary: keep the speaker's exact mix, it is correct as-is.\n" +
     "CURRENT LOCAL TIME: " + new Date().toLocaleString("en-GB", { weekday:"long", year:"numeric", month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" }) +
     " (timezone " + (Intl.DateTimeFormat().resolvedOptions().timeZone || "local") + "). Compute delay_seconds from THIS moment.\n" +
     "Return ONLY minified JSON with these keys:\n" +
@@ -1746,7 +1746,7 @@ $("agentsChip").onclick = function(){
   toast(agentsDeep ? "🤝 Deep mode: Transcriber → Organizer agents" : "⚡ Fast mode: one AI call");
 };
 function promptTranscribe(){
-  return "You are Agent 1 (Transcriber). Transcribe this voice note VERBATIM (Arabic, English or mixed — dialect and typos in speech are fine).\n" +
+  return "You are Agent 1 (Transcriber). The speaker CODE-SWITCHES: Egyptian Arabic base with English words embedded mid-sentence (e.g. بقولك please حط timer كمان 3 seconds ولا حاجة). Transcribe VERBATIM in the original scripts: Arabic in Arabic script, English in Latin script, digits as spoken. Never translate or transliterate.\n" +
     "Also extract \"delay_seconds\": seconds from NOW until any mentioned reminder time — including Egyptian colloquial and sloppy phrasing (كمان شوية=300, شويتين=300, كمان خمساية=300, بعد شوية=300, خمس دقايق كدا=300, الساعة ٩ مسا=until 9pm today/tomorrow, in a bit=300). Interpret intent, not dictionary words. Count a time ONLY for the speaker's OWN commitments; time inside quoted speech (وهو قاللى اصبر كمان شوية / he told me to wait) → delay_seconds=null and quoted_time=true.\n" +
     "Return ONLY minified JSON: {\"transcript\":\"…\", \"delay_seconds\":number|null, \"quoted_time\":boolean}";
 }
@@ -1782,7 +1782,7 @@ async function groqTranscribe(dataUrl){
   var fd = new FormData();
   fd.append("file", new File([blob], "note." + ext, { type: mime }));
   fd.append("model", "whisper-large-v3");
-  fd.append("prompt", "Egyptian Arabic voice note, may mix Arabic and English. Transcribe faithfully in the original language(s).");
+  fd.append("prompt", "Egyptian Arabic voice note that CODE-SWITCHES: Egyptian Arabic base with English words embedded mid-sentence (e.g. بقولك please حط timer كمان 3 seconds ولا حاجة). Transcribe VERBATIM: Arabic words in Arabic script, English words in Latin script, digits as spoken. Never translate, never transliterate English into Arabic.");
   fd.append("response_format", "json");
   fd.append("temperature", "0");
   var resp = await withTimeout(fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
@@ -2115,8 +2115,13 @@ function showResult(ai, srcTag, howText){
   $("resTrans").textContent = (ai && ai.transcript) || EMPTY_TXT;
   $("resSum").textContent = (ai && ai.summary) ? ("🧠 " + ai.summary) : "";
   $("resTime").textContent = howText || "";
-  var r0 = ai && ai.reminders && ai.reminders[0];
-  $("resOrg").textContent = r0 ? ("▸ " + r0.title + ((r0.bullets && r0.bullets.length) ? "\n" + r0.bullets.map(function(b){ return "• " + b; }).join("\n") : "")) : "";
+  var rems = (ai && ai.reminders) || [];
+  $("resOrg").textContent = rems.length
+    ? rems.map(function(r, i){
+        var head = (rems.length > 1 ? (i + 1) + ". " : "▸ ") + r.title;
+        return head + ((r.bullets && r.bullets.length) ? "\n" + r.bullets.map(function(b){ return "   • " + b; }).join("\n") : "");
+      }).join("\n")
+    : "";
 }
 function setEmptyTranscript(){
   if(lastNote){ lastNote.transcript = EMPTY_TXT;
