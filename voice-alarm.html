@@ -591,7 +591,6 @@ function parseWhen(raw, opts){
   }
   m = s.match(/(\d+)\s*(ثانية|ثواني|ثوانٍ|ثوان|دقيقة|دقائق|ساعة|ساعات|يوم|ايام)/);
   if(m){ var ms3 = unitToMs(parseInt(m[1],10), m[2]); if(ms3 && narratedOK(src, m[0], opts)) return {dueAt: Date.now()+ms3, phrase:m[0]}; }
-  var src = p;
   /* Egyptian dialect numbers: "كمان خمساية", "كمان خمسة" -> 5 min */
   m = src.match(new RegExp("(?:كمان|بعد|خلال)\\s*" + NUMW + "(?:\\s*" + UNITW + ")?"));
   if(m){ var ams = arNumMs(m[1], m[2]); if(ams && narratedOK(src, m[0], opts)) return {dueAt: Date.now()+ams, phrase:m[0]}; }
@@ -1097,7 +1096,7 @@ function startRecognition(onInterim, onFinal, onErr){
   return r;
 }
 var IS_MOBILE = /Android|iPhone|iPad|Mobi/i.test(navigator.userAgent || "");
-var APP_VERSION = "v35";
+var APP_VERSION = "v36";
 function micState(cb){
   if(navigator.permissions && navigator.permissions.query){
     navigator.permissions.query({name:"microphone"}).then(function(p){ cb(p.state); }).catch(function(){ cb("unknown"); });
@@ -1257,8 +1256,7 @@ function startRec(){
         blobSilent(blob, function(sil){ sil ? setEmptyTranscript() : transcribeAudio(); });
       };
       fr.readAsDataURL(blob);
-      }catch(e){ toast("⚠ Recorder hiccup — saved a placeholder note"); var d = Date.now() - recStart;
-        saveVoiceNote({dataUrl: makeSilenceBlob(d) ? null : null}, 0); rescueNote(d); }
+      }catch(e){ toast("⚠ Recorder hiccup — saved a placeholder note"); rescueNote(Date.now() - recStart); }
     };
     mediaRec.start();
     recStart = Date.now();
@@ -2219,6 +2217,7 @@ function showResult(ai, srcTag, howText){
   var rc = $("resCard"); if(!rc) return;
   rc.style.display = "block";
   lastAI = ai || {};
+  if(srcTag !== "note" && typeof chatHist !== "undefined" && chatHist.length){ chatHist = []; chatRender(); }
   $("resEngine").textContent = SRC_LABEL[srcTag] || srcTag || "—";
   $("resTrans").value = (ai && ai.transcript) || EMPTY_TXT;
   $("resSum").textContent = (ai && ai.summary) ? ("🧠 " + ai.summary) : "";
@@ -2387,6 +2386,10 @@ async function groqChat(userText){
   return out;
 }
 function chatRender(){
+  if(!chatHist.length){
+    $("chatLog").innerHTML = "<div style='color:#868e96'>🤖 Hi. Ask me anything about your notes — «what should I do first?», «plan my day», «organize this»… (English replies, spoken too)</div>";
+    return;
+  }
   $("chatLog").innerHTML = chatHist.slice(-12).map(function(m){
     return "<div style='margin:4px 0'><b>" + (m.role === "user" ? "🧑" : "🤖") + ":</b> " + esc(String(m.content).slice(0, 900)) + "</div>";
   }).join("");
@@ -2403,8 +2406,9 @@ async function chatSend(){
     try{ var r = await groqChat(t); chatHist.push({ role: "assistant", content: r }); chatRender(); confirmSpeak(r.slice(0, 180), false); }
     catch(e){ chatHist.push({ role: "assistant", content: "⚠ " + String(e.message || e).slice(0, 120) }); chatRender(); }
   }
-  /* referee: a time mentioned in CHAT arms a timer too, any language mix */
-  var w = parseWhen(t);
+  /* referee: a timer arms from chat ONLY with real intent, any language mix */
+  var wantsTimer = /(remind|timer|alarm|فكرني|فكرنى|ذكرني|ذكرنى|نبهني|تنبيه|حط|اضبط|ضبط|set|wake)/i.test(t);
+  var w = wantsTimer ? parseWhen(t) : null;
   if(w){
     addTask(t.slice(0, 60), "", w.dueAt, null, {auto3s: false, spaced: false});
     chatHist.push({ role: "assistant", content: "⏱ Timer armed: rings " + fmtDur(w.dueAt - Date.now()) + " from now «" + (w.phrase || "") + "»" });
@@ -2718,6 +2722,7 @@ loadHist();
 renderNotes();
 updateTeam();
 renderTxtNotes();
+chatRender();
 if(calY == null){ var _n = new Date(); calY = _n.getFullYear(); calM = _n.getMonth(); selDay = dayKey(Date.now()); }
 render();
 renderHist();
