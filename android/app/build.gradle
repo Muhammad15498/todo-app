@@ -1,0 +1,14 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'com.moe.voicealarm'
+    compileSdk 34
+    defaultConfig {
+        applicationId "com.moe.voicealarm"
+        minSdk 24
+        targetSdk 34
+        versionCode 21
+        versionName "v21-native"
+    }
+    buildTypes { release { minifyEnabled false } }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+}
